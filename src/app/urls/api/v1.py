@@ -1,5 +1,5 @@
 from django.urls import include, path
 
 urlpatterns = [
-    path("v1/main/", include("main.urls")),
+    path("auth/", include("accounts.urls", namespace="auth")),
 ]

@@ -8,7 +8,7 @@ from drf_spectacular.views import (
 )
 
 urlpatterns = [
-    # path("api/", include("app.urls.api.v1")),
+    path("api/v1/", include("app.urls.api.v1")),
     path("admin/", admin.site.urls),
 ]
 
