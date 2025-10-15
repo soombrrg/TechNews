@@ -109,6 +109,7 @@ dependencies = [
     { name = "drf-spectacular", extra = ["sidecar"] },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pyjwt" },
     { name = "uvicorn" },
     { name = "whitenoise" },
 ]
@@ -145,6 +146,7 @@ requires-dist = [
     { name = "drf-spectacular", extras = ["sidecar"], specifier = ">=0.28.0" },
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2.10" },
+    { name = "pyjwt", specifier = ">=2.10.1" },
     { name = "uvicorn", specifier = ">=0.35.0" },
     { name = "whitenoise", specifier = ">=6.9.0" },
 ]

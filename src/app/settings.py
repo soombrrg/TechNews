@@ -30,6 +30,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "behaviors.apps.BehaviorsConfig",
     "rest_framework",
+    "rest_framework_simplejwt",
     "whitenoise",
     # "cachalot",
     # "storages",
@@ -156,6 +157,9 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Custom User Model
+AUTH_USER_MODEL = "accounts.User"
 
 # Security
 SECURITY_MODE = env("SECURITY_MODE")
@@ -286,8 +290,23 @@ else:
         "http://127.0.0.1:5173",
     ]
 
-# JWT
-# ...
+# JWT Configuration
+from datetime import timedelta  # noqa
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
 
 # Celery, Celery beat
 # ...
