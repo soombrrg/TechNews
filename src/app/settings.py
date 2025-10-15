@@ -31,12 +31,17 @@ THIRD_PARTY_APPS = [
     "behaviors.apps.BehaviorsConfig",
     "rest_framework",
     "rest_framework_simplejwt",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
+    "corsheaders",
     "whitenoise",
     # "cachalot",
     # "storages",
 ]
 
-LOCAL_APPS = ["main", "accounts"]
+LOCAL_APPS = [
+    "accounts",
+]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
