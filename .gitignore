@@ -271,3 +271,4 @@ pyrightconfig.json
 postgres
 static
 staticfiles
+/.zed/settings.json

@@ -110,6 +110,6 @@ def logout_view(request):
         if refresh_token:
             token = RefreshToken(refresh_token)
             token.blacklist()
-        return Response({"msg": "Logout successfully."}, status=status.HTTP_200_OK)
+        return Response({"msg": "Logged out successfully."}, status=status.HTTP_200_OK)
     except Exception:
-        return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
