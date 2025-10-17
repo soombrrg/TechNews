@@ -28,8 +28,8 @@ urlpatterns = [
     ),
     # Posts
     path("", PostListCreateView.as_view(), name="post-list"),
-    path("user-posts/", UserPostsView.as_view(), name="user-posts"),
-    path("popular/", popular_posts, name="popular-posts"),
-    path("recent/", recent_posts, name="recent-posts"),
     path("<slug:slug>/", PostDetailView.as_view(), name="post-detail"),
+    path("recent/", recent_posts, name="recent-posts"),
+    path("popular/", popular_posts, name="popular-posts"),
+    path("user-posts/", UserPostsView.as_view(), name="user-posts"),
 ]
