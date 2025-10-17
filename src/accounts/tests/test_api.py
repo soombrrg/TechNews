@@ -186,7 +186,6 @@ class TestLogout:
         assert response.data["error"] == "Invalid token."
 
     def test_invalid_token(self, api, auth_user):
-
         response = api.api_client.post(
             reverse("auth:logout"), data={"refresh_token": "invalid_token"}
         )
