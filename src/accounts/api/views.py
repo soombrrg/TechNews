@@ -1,4 +1,5 @@
 from django.contrib.auth import login
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -101,6 +102,22 @@ class ChangePasswordView(generics.UpdateAPIView):
         )
 
 
+@extend_schema(
+    request={
+        "application/json": {
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "description": "Refresh token to blacklist",
+                }
+            },
+        }
+    },
+    responses={
+        200: {"properties": {"msg": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def logout_view(request):

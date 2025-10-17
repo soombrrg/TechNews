@@ -42,6 +42,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "accounts",
+    "main",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -163,6 +164,9 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Default uniqueness for slug from Slugged
+UNIQUE_SLUG_BEHAVIOR = True
 
 # Custom User Model
 AUTH_USER_MODEL = "accounts.User"
