@@ -12,7 +12,7 @@ class SluggedModel(Slugged, models.Model):
         abstract = True
 
 
-class PublishedModel(Published, models.Model):
+class PublishedModel(Published, models.Model):  # type: ignore[django-manager-missing]
     DRAFT = "d"
     PUBLISHED = "p"
 

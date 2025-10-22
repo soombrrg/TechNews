@@ -5,13 +5,12 @@ from django.urls import reverse
 from app.models import PublishedModel, SluggedModel, TimeStampedModel
 
 
-class Category(SluggedModel):
+class Category(SluggedModel):  # type: ignore[django-manager-missing]
     """Model for Posts Categories"""
 
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     created = models.DateTimeField(auto_now_add=True)
-    objects = models.Manager()
 
     class Meta:
         db_table = "categories"
@@ -31,7 +30,7 @@ class Post(SluggedModel, PublishedModel, TimeStampedModel):
     """Model for Posts"""
 
     category = models.ForeignKey(
-        Category,
+        "Category",
         on_delete=models.SET_NULL,
         null=True,
         related_name="posts",
@@ -70,7 +69,7 @@ class Post(SluggedModel, PublishedModel, TimeStampedModel):
     def comments_count(self) -> int:
         """Count of comments for post"""
         try:
-            return self.comments.filter(is_acitve=True).count()
+            return self.comments.filter(is_active=True).count()
         except AttributeError:
             return 0
 

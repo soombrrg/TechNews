@@ -87,13 +87,15 @@ class UserProfileSerializer(serializers.ModelSerializer[User]):
         )
         read_only_fields = ("id", "created", "modified")
 
-    def get_posts_count(self, obj: User) -> int:
+    @staticmethod
+    def get_posts_count(obj: User) -> int:
         try:
             return obj.posts.count()
         except AttributeError:
             return 0
 
-    def get_comments_count(self, obj: User) -> int:
+    @staticmethod
+    def get_comments_count(obj: User) -> int:
         try:
             return obj.comments.count()
         except AttributeError:
