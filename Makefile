@@ -4,12 +4,12 @@ deps:
 	uv sync
 
 fmt:
-	black src
-	isort src
+	uv run uv run black src
+	uv run isort src
 
 lint:
-	mypy src
-	flake8 src
+	uv run flake8 src
+	uv run mypy src
 
 test:
 	cd src && uv run pytest

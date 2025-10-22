@@ -1,8 +1,14 @@
+from typing import Any, Type
+
 from django.contrib.auth import login
+from django.contrib.auth.base_user import AbstractBaseUser
+from django.contrib.auth.models import AnonymousUser
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.api.serializers import (
@@ -21,8 +27,11 @@ class RegistrationView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
+    http_method_names = ["post"]
 
-    def create(self, request, *args, **kwargs):
+    def create(
+        self, request: Request, *args: Any, **kwargs: dict[str, Any]
+    ) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -46,7 +55,7 @@ class LoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
     permission_classes = [permissions.AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: Any, **kwargs: dict[str, Any]) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
@@ -71,10 +80,10 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self):
+    def get_object(self) -> AbstractBaseUser | AnonymousUser:
         return self.request.user
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method in ["PUT", "PATCH"]:
             return UserUpdateSerializer
         return UserProfileSerializer
@@ -86,10 +95,12 @@ class ChangePasswordView(generics.UpdateAPIView):
     serializer_class = ChangePasswordSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_object(self):
+    def get_object(self) -> AbstractBaseUser | AnonymousUser:
         return self.request.user
 
-    def update(self, request, *args, **kwargs):
+    def update(
+        self, request: Request, *args: Any, **kwargs: dict[str, Any]
+    ) -> Response:
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
@@ -120,7 +131,7 @@ class ChangePasswordView(generics.UpdateAPIView):
 )
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
-def logout_view(request):
+def logout_view(request: Request) -> Response:
     """Logout user"""
     try:
         refresh_token = request.data.get("refresh_token")

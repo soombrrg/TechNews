@@ -1,10 +1,15 @@
-from django.db.models import Q
+from typing import Any, Type
+
+from django.contrib.auth.models import AnonymousUser
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
 from rest_framework import filters, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import Serializer
 
 from main.api.serializers import (
     CategorySerializer,
@@ -52,9 +57,9 @@ class PostListCreateView(generics.ListCreateAPIView):
     ordering_fields = ["created", "modified", "views_count", "title"]
     ordering = ["-created"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Post]:
         """Returning posts, depending on access right"""
-        queryset = Post.objects.select_related("auther", "category")
+        queryset = Post.objects.select_related("author", "category")
 
         # Filter using access right
         if not self.request.user.is_authenticated:
@@ -65,7 +70,7 @@ class PostListCreateView(generics.ListCreateAPIView):
             )
         return queryset
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method == "POST":
             return PostCreateUpdateSerializer
         return PostListSerializer
@@ -74,17 +79,19 @@ class PostListCreateView(generics.ListCreateAPIView):
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Api endpoint for concrete post"""
 
-    queryset = Post.objects.select_related("auther", "category")
+    queryset = Post.objects.select_related("author", "category")
     serializer_class = PostDetailSerializer
     permission_classes = [IsAuthorOrReadOnly]
     lookup_field = "slug"
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method in ["PUT", "PATCH"]:
             return PostCreateUpdateSerializer
         return PostDetailSerializer
 
-    def retrieve(self, request, *args, **kwargs):
+    def retrieve(
+        self, request: Request, *args: Any, **kwargs: dict[str, Any]
+    ) -> Response:
         """Increasing views count on GET request"""
         instance = self.get_object()
 
@@ -110,9 +117,13 @@ class UserPostsView(generics.ListAPIView):
     ordering_fields = ["created", "modified", "views_count", "title"]
     ordering = ["-created"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Post]:
         # Check for Swagger Schema generating
         if getattr(self, "swagger_fake_view", False):
+            return Post.objects.none()
+
+        # Explicit type check for MyPy
+        if isinstance(self.request.user, AnonymousUser):
             return Post.objects.none()
 
         return Post.objects.filter(author=self.request.user).select_related(
@@ -128,7 +139,7 @@ class UserPostsView(generics.ListAPIView):
 )
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
-def posts_by_category(request, category_slug):
+def posts_by_category(request: Request, category_slug: str) -> Response:
     """Post for defined category"""
     category = get_object_or_404(Category, slug=category_slug)
     posts = (
@@ -155,7 +166,7 @@ def posts_by_category(request, category_slug):
 @extend_schema(responses=PostListSerializer(many=True))
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
-def popular_posts(request):
+def popular_posts(request: Request) -> Response:
     """10 most popular Posts"""
     posts = (
         Post.objects.filter(publication_status=Post.PUBLISHED)
@@ -175,7 +186,7 @@ def popular_posts(request):
 @extend_schema(responses=PostListSerializer(many=True))
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
-def recent_posts(request):
+def recent_posts(request: Request) -> Response:
     """10 most recent Posts"""
     posts = (
         Post.objects.filter(publication_status=Post.PUBLISHED)

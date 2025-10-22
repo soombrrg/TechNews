@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -5,7 +7,7 @@ from rest_framework import serializers
 from accounts.models import User
 
 
-class UserRegistrationSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(serializers.ModelSerializer[User]):
     """Serializer for registering new users"""
 
     password = serializers.CharField(write_only=True, validators=[validate_password])
@@ -22,14 +24,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "last_name",
         )
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         if attrs["password"] != attrs["password_confirmation"]:
             raise serializers.ValidationError(
                 {"password": "Password fields does not match."},
             )
         return attrs
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]) -> User:
         validated_data.pop("password_confirmation")
         user = User.objects.create_user(**validated_data)
         return user
@@ -41,7 +43,7 @@ class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         email = attrs.get("email")
         password = attrs.get("password")
         if email and password:
@@ -60,7 +62,7 @@ class UserLoginSerializer(serializers.Serializer):
             raise serializers.ValidationError('Must include "email" and "password".')
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(serializers.ModelSerializer[User]):
     """Serializer for user profile"""
 
     full_name = serializers.ReadOnlyField()
@@ -85,20 +87,20 @@ class UserProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("id", "created", "modified")
 
-    def get_posts_count(self, obj) -> int:
+    def get_posts_count(self, obj: User) -> int:
         try:
             return obj.posts.count()
         except AttributeError:
             return 0
 
-    def get_comments_count(self, obj) -> int:
+    def get_comments_count(self, obj: User) -> int:
         try:
             return obj.comments.count()
         except AttributeError:
             return 0
 
 
-class UserUpdateSerializer(serializers.ModelSerializer):
+class UserUpdateSerializer(serializers.ModelSerializer[User]):
     """Serializer for updating user profile"""
 
     class Meta:
@@ -110,7 +112,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "bio",
         )
 
-    def update(self, instance, validated_data):
+    def update(self, instance: User, validated_data: dict) -> User:
         for attrs, value in validated_data.items():
             setattr(instance, attrs, value)
         instance.save()
@@ -124,43 +126,21 @@ class ChangePasswordSerializer(serializers.Serializer):
     new_password = serializers.CharField(required=True, validators=[validate_password])
     new_password_confirmation = serializers.CharField(required=True)
 
-    def validate_old_password(self, value):
+    def validate_old_password(self, value: str) -> str | None:
         user = self.context["request"].user
         if not user.check_password(value):
             raise serializers.ValidationError("Incorrect old password.")
         return value
 
-    def validate(self, attrs):
+    def validate(self, attrs: dict) -> dict:
         if attrs["new_password"] != attrs["new_password_confirmation"]:
             raise serializers.ValidationError(
                 {"new_password": "Password fields does not match."}
             )
         return attrs
 
-    def save(self):
+    def save(self, **kwargs: Any) -> User:
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save()
         return user
-
-
-# class ChangePasswordView(generics.UpdateAPIView):
-#     """Changing user password"""
-#
-#     serializer_class = ChangePasswordSerializer
-#     permission_classes = [permissions.IsAuthenticated]
-#
-#     def get_object(self):
-#         return self.request.user
-#
-#     def update(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#         serializer.save()
-#
-#         return Response(
-#             {
-#                 "msg": "Password successfully changed.",
-#             },
-#             status=status.HTTP_200_OK,
-#         )

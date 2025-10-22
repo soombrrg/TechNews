@@ -16,6 +16,13 @@ class AppClient:
 
         return result.json()
 
+    def post(self, *args, expected_status_code=200, **kwargs):
+        result = self.api_client.post(*args, **kwargs)
+
+        assert result.status_code == expected_status_code
+
+        return result.json()
+
 
 ## If using S3
 # class AppS3:

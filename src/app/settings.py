@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from environ import environ
+from environ import environ  # type: ignore[import-untyped]
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -276,7 +276,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "API Title",
     "DESCRIPTION": "API built with DRF",
     "SCHEMA_PATH_PREFIX": r"/api/v[0-9]",
-    "SCHEMA_PATH_PREFIX_TRIM": True,
+    # "SCHEMA_PATH_PREFIX_TRIM": True,
     "COMPONENT_NO_READ_ONLY_REQUIRED": True,
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",

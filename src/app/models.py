@@ -1,23 +1,18 @@
-from behaviors.behaviors import Authored, Published, Slugged, Timestamped
+from behaviors.behaviors import Published, Slugged, Timestamped
 from django.db import models
 
 
-class TimeStampedModel(Timestamped):
+class TimeStampedModel(Timestamped, models.Model):
     class Meta:
         abstract = True
 
 
-class AuthoredModel(Authored):
+class SluggedModel(Slugged, models.Model):
     class Meta:
         abstract = True
 
 
-class SluggedModel(Slugged):
-    class Meta:
-        abstract = True
-
-
-class PublishedModel(Published):
+class PublishedModel(Published, models.Model):
     DRAFT = "d"
     PUBLISHED = "p"
 

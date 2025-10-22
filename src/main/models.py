@@ -1,7 +1,8 @@
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 
-from app.models import AuthoredModel, PublishedModel, SluggedModel, TimeStampedModel
+from app.models import PublishedModel, SluggedModel, TimeStampedModel
 
 
 class Category(SluggedModel):
@@ -10,6 +11,7 @@ class Category(SluggedModel):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     created = models.DateTimeField(auto_now_add=True)
+    objects = models.Manager()
 
     class Meta:
         db_table = "categories"
@@ -17,7 +19,7 @@ class Category(SluggedModel):
         verbose_name_plural = "Categories"
         ordering = ["-created"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     @property
@@ -25,14 +27,19 @@ class Category(SluggedModel):
         return self.name
 
 
-class Post(AuthoredModel, SluggedModel, PublishedModel, TimeStampedModel):
+class Post(SluggedModel, PublishedModel, TimeStampedModel):
     """Model for Posts"""
 
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
         null=True,
-        related_name="%(app_label)s_%(class)s_posts",
+        related_name="posts",
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="posts",
     )
 
     title = models.CharField(max_length=200)
@@ -52,7 +59,7 @@ class Post(AuthoredModel, SluggedModel, PublishedModel, TimeStampedModel):
             models.Index(fields=["author", "-created"]),
         ]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title
 
     @property
@@ -67,10 +74,10 @@ class Post(AuthoredModel, SluggedModel, PublishedModel, TimeStampedModel):
         except AttributeError:
             return 0
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("post-detail", kwargs={"slug": self.slug})
 
-    def increment_views(self):
+    def increment_views(self) -> None:
         """Increment the views count"""
         self.views_count += 1
-        self.save(update_fields=["views_counts"])
+        self.save(update_fields=["views_count"])
