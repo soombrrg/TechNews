@@ -1,5 +1,4 @@
 import pytest
-from django.contrib.auth.hashers import make_password
 from django.urls import reverse
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -9,23 +8,10 @@ from accounts.models import User
 pytestmark = [pytest.mark.django_db]
 
 
-@pytest.fixture
-def user(mixer):
-    return mixer.blend(
-        User, password=make_password("valid_password"), avatar="avatar.png"
-    )
-
-
-@pytest.fixture
-def auth_user(api, user):
-    api.api_client.force_authenticate(user)
-    return user
-
-
 class TestRegistration:
     @pytest.mark.xfail
     def test_register_get(self, api):
-        response = api.get(reverse("auth:register"))
+        response = api.get(reverse("v1:auth:register"))
 
     def test_register_post_w_invalid_data(self, api):
         data = {
@@ -36,8 +22,9 @@ class TestRegistration:
             "first_name": "",
             "last_name": "last_name",
         }
-        response = api.api_client.post(reverse("auth:register"), data=data)
-        assert response.status_code == 400
+        response = api.post(
+            reverse("v1:auth:register"), data=data, expected_status_code=400
+        )
 
     def test_register_post_w_valid_data(self, api):
         data = {
@@ -48,31 +35,33 @@ class TestRegistration:
             "first_name": "first_name",
             "last_name": "last_name",
         }
-        response = api.api_client.post(reverse("auth:register"), data=data)
-        response_data = response.data
+        response = api.post(
+            reverse("v1:auth:register"),
+            data=data,
+            expected_status_code=201,
+        )
         expected_fields = ["user", "refresh", "access", "msg"]
 
-        assert response.status_code == 201
         # Test structure of response data
-        assert all(key in response_data for key in expected_fields)
-        assert response_data["msg"] == "User registered successfully"
+        assert all(key in response for key in expected_fields)
+        assert response["msg"] == "User registered successfully"
 
         data.pop("password")
         data.pop("password_confirmation")
         for key in data:
-            assert response_data["user"][key] == data[key]
+            assert response["user"][key] == data[key]
 
         # Test computed fields
         supposed_full_name = f"{data['first_name']} {data['last_name']}".strip()
-        assert response_data["user"]["full_name"] == supposed_full_name
-        assert response_data["user"]["posts_count"] == 0
-        assert response_data["user"]["comments_count"] == 0
+        assert response["user"]["full_name"] == supposed_full_name
+        assert response["user"]["posts_count"] == 0
+        assert response["user"]["comments_count"] == 0
 
 
 class TestLogin:
     def test_success(self, api, user):
         data = {"email": user.email, "password": "valid_password"}
-        response = api.api_client.post(reverse("auth:login"), data=data)
+        response = api.post(reverse("v1:auth:login"), data=data)
 
         expected_fields = [
             "user",
@@ -81,50 +70,62 @@ class TestLogin:
             "msg",
         ]
 
-        assert response.status_code == 200
         for key in expected_fields:
-            assert key in response.data
-        assert response.data["msg"] == "Logged in successfully."
+            assert key in response
+        assert response["msg"] == "Logged in successfully."
 
     def test_user_disabled(self, api, user):
         user.is_active = False
+        user.save()
         data = {
             "email": user.email,
             "password": "valid_password",
         }
-        response = api.api_client.post(reverse("auth:login"), data=data)
-        assert response.status_code == 400
+        response = api.post(
+            reverse("v1:auth:login"),
+            data=data,
+            expected_status_code=400,
+        )
 
     def test_password_not_provided(self, api, user):
         data = {
             "email": user.email,
         }
-        response = api.api_client.post(reverse("auth:login"), data=data)
-        assert response.status_code == 400
+        response = api.post(
+            reverse("v1:auth:login"),
+            data=data,
+            expected_status_code=400,
+        )
 
     def test_invalid_password(self, api, user):
         data = {
             "email": user.email,
-            "password": "wrongpassword",
+            "password": "wrong_password",
         }
-        response = api.api_client.post(reverse("auth:login"), data=data)
-        assert response.status_code == 400
+        response = api.post(
+            reverse("v1:auth:login"),
+            data=data,
+            expected_status_code=400,
+        )
 
     def test_invalid_username(self, api, user):
         data = {
-            "email": "wronguser",
+            "email": "wrong_user",
             "password": user.password,
         }
-        response = api.api_client.post(reverse("auth:login"), data=data)
-        assert response.status_code == 400
+        response = api.post(
+            reverse("v1:auth:login"),
+            data=data,
+            expected_status_code=400,
+        )
 
 
 class TestProfile:
     def test_get_not_authenticated(self, api, user):
-        response = api.get(reverse("auth:profile"), expected_status_code=401)
+        response = api.get(reverse("v1:auth:profile"), expected_status_code=401)
 
     def test_get_success(self, api, auth_user):
-        response = api.get(reverse("auth:profile"))
+        response = api.get(reverse("v1:auth:profile"))
         expected_fields = [
             "id",
             "username",
@@ -151,10 +152,10 @@ class TestProfile:
             "bio": "bio",
         }
         if method == "put":
-            response = api.api_client.put(reverse("auth:profile"), data=data)
+            response = api.api_client.put(reverse("v1:auth:profile"), data=data)
 
         if method == "patch":
-            response = api.api_client.patch(reverse("auth:profile"), data=data)
+            response = api.api_client.patch(reverse("v1:auth:profile"), data=data)
 
         assert response.status_code == 200
         assert response.data["avatar"] is None
@@ -164,39 +165,41 @@ class TestProfile:
 
 class TestLogout:
     def test_not_authenticated(self, api, user):
-        response = api.api_client.post(reverse("auth:logout"))
-        assert response.status_code == 401
+        response = api.post(reverse("v1:auth:logout"), expected_status_code=401)
 
     def test_successfully(self, api, auth_user):
         refresh = RefreshToken.for_user(auth_user)
 
-        response = api.api_client.post(
-            reverse("auth:logout"), data={"refresh_token": refresh}
+        response = api.post(
+            reverse("v1:auth:logout"),
+            data={"refresh_token": refresh},
+            expected_status_code=200,
         )
 
-        assert response.status_code == 200
-        assert response.data["msg"] == "Logged out successfully."
+        assert response["msg"] == "Logged out successfully."
 
         assert BlacklistedToken.objects.filter(token__jti=refresh["jti"]).exists()
 
-        response = api.api_client.post(
-            reverse("auth:logout"), data={"refresh_token": refresh}
+        response = api.post(
+            reverse("v1:auth:logout"),
+            data={"refresh_token": refresh},
+            expected_status_code=400,
         )
-        assert response.status_code == 400
-        assert response.data["error"] == "Invalid token."
+        assert response["error"] == "Invalid token."
 
     def test_invalid_token(self, api, auth_user):
-        response = api.api_client.post(
-            reverse("auth:logout"), data={"refresh_token": "invalid_token"}
+        response = api.post(
+            reverse("v1:auth:logout"),
+            data={"refresh_token": "invalid_token"},
+            expected_status_code=400,
         )
 
-        assert response.status_code == 400
-        assert response.data["error"] == "Invalid token."
+        assert response["error"] == "Invalid token."
 
 
 class TestChangePassword:
     def test_not_authenticated(self, api, user):
-        response = api.api_client.put(reverse("auth:change_password"), data={})
+        response = api.api_client.put(reverse("v1:auth:change-password"), data={})
         assert response.status_code == 401
 
     @pytest.mark.parametrize("method", ["put", "patch"])
@@ -224,10 +227,12 @@ class TestChangePassword:
     def test_success(self, api, auth_user, method, data, validity):
         old_hashed_password = auth_user.password
         if method == "put":
-            response = api.api_client.put(reverse("auth:change_password"), data=data)
+            response = api.api_client.put(reverse("v1:auth:change-password"), data=data)
 
         if method == "patch":
-            response = api.api_client.patch(reverse("auth:change_password"), data=data)
+            response = api.api_client.patch(
+                reverse("v1:auth:change-password"), data=data
+            )
 
         new_password = User.objects.get(username=auth_user.username).password
         if validity:
