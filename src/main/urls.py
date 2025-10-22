@@ -5,7 +5,7 @@ from main.api.views import (
     CategoryListCreateView,
     PostDetailView,
     PostListCreateView,
-    UserPostsView,
+    UsersPostsView,
     popular_posts,
     posts_by_category,
     recent_posts,
@@ -30,6 +30,6 @@ urlpatterns = [
     path("", PostListCreateView.as_view(), name="post-list"),
     path("recent/", recent_posts, name="recent-posts"),
     path("popular/", popular_posts, name="popular-posts"),
-    path("user-posts/", UserPostsView.as_view(), name="user-posts"),
+    path("users-posts/", UsersPostsView.as_view(), name="users-posts"),
     path("<slug:slug>/", PostDetailView.as_view(), name="post-detail"),
 ]

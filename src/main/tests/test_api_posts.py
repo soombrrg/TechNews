@@ -223,13 +223,13 @@ class TestRecentAndPopularPosts:
             assert parse_datetime(response[i]["created"]) == ordered_posts[i].created
 
 
-class TestUserPosts:
+class TestUsersPosts:
 
     def test_permission_for_not_authenticated(self, api, post):
-        response = api.get(reverse("v1:posts:user-posts"), expected_status_code=401)
+        response = api.get(reverse("v1:posts:users-posts"), expected_status_code=401)
 
         response = api.post(
-            reverse("v1:posts:user-posts"),
+            reverse("v1:posts:users-posts"),
             data={"content": "Test content"},
             expected_status_code=401,
         )
@@ -239,7 +239,7 @@ class TestUserPosts:
         post_2 = post_factory(publication_status=Post.DRAFT, author=auth_user)
         post_3 = post_factory(publication_status=Post.DRAFT)
 
-        response = api.get(reverse(f"v1:posts:user-posts"))
+        response = api.get(reverse(f"v1:posts:users-posts"))
         response_results = response["results"]
 
         # Test response fields

@@ -264,6 +264,299 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenVerify'
           description: ''
+  /api/v1/comments/:
+    get:
+      operationId: comments_list
+      description: Listing and creating comments
+      parameters:
+      - in: query
+        name: author
+        schema:
+          type: string
+          format: uuid
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: parent
+        schema:
+          type: integer
+      - in: query
+        name: post
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCommentList'
+          description: ''
+    post:
+      operationId: comments_create
+      description: Listing and creating comments
+      tags:
+      - comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommentCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentCreate'
+          description: ''
+  /api/v1/comments/{comment_id}/replies/:
+    get:
+      operationId: comments_replies_retrieve
+      description: GET comment`s replies
+      parameters:
+      - in: path
+        name: comment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        parent_comment:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+        replies:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+        replies_count:
+          content:
+            application/json:
+              schema:
+                type: int
+          description: ''
+  /api/v1/comments/{id}/:
+    get:
+      operationId: comments_retrieve
+      description: Detail view for retrieve, update, and delete comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentDetail'
+          description: ''
+    put:
+      operationId: comments_update
+      description: Detail view for retrieve, update, and delete comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommentUpdate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentUpdate'
+          description: ''
+    patch:
+      operationId: comments_partial_update
+      description: Detail view for retrieve, update, and delete comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCommentUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCommentUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCommentUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentUpdate'
+          description: ''
+    delete:
+      operationId: comments_destroy
+      description: Detail view for retrieve, update, and delete comment
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/comments/post/{post_id}/:
+    get:
+      operationId: comments_post_list
+      description: GET comments of certain post
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        post:
+          content:
+            application/json:
+              schema:
+                id:
+                  type: int
+                title:
+                  type: string
+                slug:
+                  type: string
+          description: ''
+        comments:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+        comments_count:
+          content:
+            application/json:
+              schema:
+                type: int
+          description: ''
+  /api/v1/comments/users-comments/:
+    get:
+      operationId: comments_users_comments_list
+      description: Comments of current user
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: query
+        name: parent
+        schema:
+          type: integer
+      - in: query
+        name: post
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCommentList'
+          description: ''
   /api/v1/docs/schema/:
     get:
       operationId: docs_schema_retrieve
@@ -814,9 +1107,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/PostList'
           description: ''
-  /api/v1/posts/user-posts/:
+  /api/v1/posts/users-posts/:
     get:
-      operationId: posts_user_posts_list
+      operationId: posts_users_posts_list
       description: Api endpoint for listing current user's posts
       parameters:
       - in: query
@@ -903,6 +1196,113 @@ components:
       - new_password
       - new_password_confirmation
       - old_password
+    Comment:
+      type: object
+      description: Base serializer for Comments
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        content:
+          type: string
+        author:
+          type: string
+          format: uuid
+          readOnly: true
+        author_info:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        parent:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        is_reply:
+          type: boolean
+          readOnly: true
+        replies_count:
+          type: integer
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - content
+    CommentCreate:
+      type: object
+      description: Serializer for Comments creation
+      properties:
+        post:
+          type: integer
+        parent:
+          type: integer
+          nullable: true
+        content:
+          type: string
+      required:
+      - content
+      - post
+    CommentDetail:
+      type: object
+      description: Detail serializer for Comments with responses
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        content:
+          type: string
+        author:
+          type: string
+          format: uuid
+          readOnly: true
+        author_info:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        parent:
+          type: integer
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        is_reply:
+          type: boolean
+          readOnly: true
+        replies_count:
+          type: integer
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          nullable: true
+        replies:
+          oneOf:
+          - type: object
+            additionalProperties: {}
+          - type: array
+            items: {}
+          readOnly: true
+      required:
+      - content
+    CommentUpdate:
+      type: object
+      description: Serializer for Comments update
+      properties:
+        content:
+          type: string
+      required:
+      - content
     PaginatedCategoryList:
       type: object
       required:
@@ -926,6 +1326,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Category'
+    PaginatedCommentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
     PaginatedPostListList:
       type: object
       required:
@@ -981,6 +1404,12 @@ components:
         new_password:
           type: string
         new_password_confirmation:
+          type: string
+    PatchedCommentUpdate:
+      type: object
+      description: Serializer for Comments update
+      properties:
+        content:
           type: string
     PatchedPostCreateUpdate:
       type: object

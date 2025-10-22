@@ -11,6 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 
+from app.permissions import IsAuthorOrReadOnly
 from main.api.serializers import (
     CategorySerializer,
     PostCreateUpdateSerializer,
@@ -18,7 +19,6 @@ from main.api.serializers import (
     PostListSerializer,
 )
 from main.models import Category, Post
-from main.permissions import IsAuthorOrReadOnly
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
@@ -102,7 +102,7 @@ class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(serializer.data)
 
 
-class UserPostsView(generics.ListAPIView):
+class UsersPostsView(generics.ListAPIView):
     """Api endpoint for listing current user's posts"""
 
     serializer_class = PostListSerializer

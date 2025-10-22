@@ -12,10 +12,12 @@ media/
 
 postgres/
 
-venv/
 storage/
 .vscode/
 tests/
+test/
 .mypy_cache/
 src/.mypy_cache/
 .pytest_cache/
+.zed
+.hypothesis

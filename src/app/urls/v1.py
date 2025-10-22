@@ -8,6 +8,7 @@ from drf_spectacular.views import (
 urlpatterns = [
     path("auth/", include("accounts.urls", namespace="auth")),
     path("posts/", include("main.urls", namespace="posts")),
+    path("comments/", include("comments.urls", namespace="comments")),
     # Swagger
     path(
         "docs/schema/",
