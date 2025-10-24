@@ -60,8 +60,17 @@ class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
             raise serializers.ValidationError("Post not found.")
         return value
 
-    def validate_parent(self, value: Comment) -> Comment | None:
-        if value and value.post != self.initial_data.get("post"):
+    def validate_parent(self, value: Comment | None) -> Comment | None:
+        # Comment can be without parent
+        if not value:
+            return value
+
+        post_data = self.initial_data.get("post")
+        if not post_data:
+            return value
+
+        # If parent provided -> checking belonging to the same post
+        if value.post.id != int(post_data):
             raise serializers.ValidationError(
                 "Parent comment must belong to the same post."
             )
