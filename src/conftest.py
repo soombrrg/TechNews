@@ -6,6 +6,7 @@ from mixer.backend.django import mixer as _mixer
 
 from accounts.models import User
 from app.test.api_clients import AppClient
+from comments.models import Comment
 from main.models import Category, Post
 
 
@@ -33,6 +34,21 @@ def auth_user(api, user: User) -> User:
 
 
 @pytest.fixture
+def category(mixer) -> Category:
+    return mixer.blend(Category)
+
+
+@pytest.fixture
+def post(mixer, category: Category, user: User) -> Post:
+    return mixer.blend(Post, category=category, author=user)
+
+
+@pytest.fixture
+def comment(mixer, category: Category, user: User, post: Post) -> Comment:
+    return mixer.blend(Comment, category=category, author=user, post=post)
+
+
+@pytest.fixture
 def category_factory(mixer):
     def _factory(**kwargs: dict[str, Any]) -> Category:
         return mixer.blend(Category, **kwargs)
@@ -49,10 +65,8 @@ def post_factory(mixer):
 
 
 @pytest.fixture
-def category(mixer) -> Category:
-    return mixer.blend(Category)
+def comment_factory(mixer):
+    def _factory(**kwargs: dict[str, Any]) -> Comment:
+        return mixer.blend(Comment, **kwargs)
 
-
-@pytest.fixture
-def post(mixer, category: Category, user: User) -> Post:
-    return mixer.blend(Post, category=category, author=user)
+    return _factory
