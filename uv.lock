@@ -246,7 +246,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "django-stubs", extras = ["compatible-mypy"], specifier = ">=5.2.7" },
-    { name = "djangorestframework-stubs", extras = ["compatible-mypy"], specifier = ">=3.16.4" },
+    { name = "djangorestframework-stubs", extras = ["compatible-mypy"], specifier = ">=3.16.5" },
     { name = "flake8", specifier = ">=7.3.0" },
     { name = "flake8-bandit", specifier = ">=4.1.1" },
     { name = "flake8-django", specifier = ">=1.1.1" },
