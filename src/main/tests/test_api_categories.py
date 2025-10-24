@@ -98,12 +98,7 @@ class TestCategoryDetail:
                 },
                 True,
             ),
-            (
-                {
-                    "description": "n",
-                },
-                False,
-            ),
+            ({"description": "n"}, False),
         ],
     )
     def test_update(self, api, auth_user, category, method, data, validity):

@@ -11,11 +11,15 @@ class CategoryAdmin(admin.ModelAdmin):
     list_filter = ("created",)
     search_fields = ("name", "description")
     prepopulated_fields = {"slug": ("name",)}
-    readonly_fields = ("created",)
+    readonly_fields = ("created", "posts_count")
 
     @admin.display(description="Posts Count")
     def posts_count(self, obj: Category) -> int:
         return obj.posts.count()
+
+    fieldsets = (
+        (None, {"fields": ("name", "slug", "description", "posts_count", "created")}),
+    )
 
 
 @admin.register(Post)
@@ -29,7 +33,6 @@ class PostAdmin(admin.ModelAdmin):
         "comments_count",
         "created",
     )
-
     list_filter = (
         "publication_status",
         "category",

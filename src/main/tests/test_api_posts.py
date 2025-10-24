@@ -126,12 +126,7 @@ class TestPostDetail:
                 },
                 True,
             ),
-            (
-                {
-                    "publication_status": "not valid",
-                },
-                False,
-            ),
+            ({"publication_status": "not valid"}, False),
         ],
     )
     def test_update(self, api, auth_user, post, method, data, validity):
@@ -147,8 +142,8 @@ class TestPostDetail:
             )
         if validity:
             assert response.status_code == 200
-            assert response.data["title"] == "New title"
-            assert response.data["content"] == "New content"
+            assert response.data["title"] == data["title"]
+            assert response.data["content"] == data["content"]
 
             serializer = PostCreateUpdateSerializer()
             expected_fields = serializer.fields

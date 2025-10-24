@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import TYPE_CHECKING, Any, Type
 
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q, QuerySet
@@ -122,9 +122,10 @@ class UsersPostsView(generics.ListAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Post.objects.none()
 
-        # Explicit type check for MyPy
-        if isinstance(self.request.user, AnonymousUser):
-            return Post.objects.none()
+        if TYPE_CHECKING:
+            # Explicit type check for MyPy
+            if isinstance(self.request.user, AnonymousUser):
+                return Post.objects.none()
 
         return Post.objects.filter(author=self.request.user).select_related(
             "category", "author"

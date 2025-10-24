@@ -1,4 +1,4 @@
-from typing import Type
+from typing import TYPE_CHECKING, Type
 
 from django.contrib.auth.models import AnonymousUser
 from django.db.models import QuerySet
@@ -82,9 +82,10 @@ class UsersCommentsView(generics.ListAPIView):
     ordering = ["-created"]
 
     def get_queryset(self) -> QuerySet[Comment]:
-        # Explicit type check for MyPy
-        if isinstance(self.request.user, AnonymousUser):
-            return Comment.objects.none()
+        if TYPE_CHECKING:
+            # Explicit type check for MyPy
+            if isinstance(self.request.user, AnonymousUser):
+                return Comment.objects.none()
 
         return Comment.objects.filter(author=self.request.user).select_related(
             "post", "parent"
