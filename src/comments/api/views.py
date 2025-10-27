@@ -87,6 +87,10 @@ class UsersCommentsView(generics.ListAPIView):
             if isinstance(self.request.user, AnonymousUser):
                 return Comment.objects.none()
 
+        # Check for Swagger Schema generating
+        if getattr(self, "swagger_fake_view", False):
+            return Comment.objects.none()
+
         return Comment.objects.filter(author=self.request.user).select_related(
             "post", "parent"
         )
