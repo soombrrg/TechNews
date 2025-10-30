@@ -14,6 +14,7 @@ from rest_framework.serializers import Serializer
 from app.permissions import IsAuthorOrReadOnly
 from main.api.serializers import (
     CategorySerializer,
+    PostsByCategorySerializer,
     PostCreateUpdateSerializer,
     PostDetailSerializer,
     PostListSerializer,
@@ -132,38 +133,6 @@ class UsersPostsView(generics.ListAPIView):
         )
 
 
-@extend_schema(
-    responses={
-        "category": CategorySerializer(),
-        "posts": PostListSerializer(many=True),
-    }
-)
-@api_view(["GET"])
-@permission_classes([permissions.AllowAny])
-def posts_by_category(request: Request, category_slug: str) -> Response:
-    """Post for defined category"""
-    category = get_object_or_404(Category, slug=category_slug)
-    posts = (
-        Post.objects.filter(category=category, publication_status=Post.PUBLISHED)
-        .select_related("author", "category")
-        .order_by("-created")
-    )
-
-    category_serializer = CategorySerializer(category)
-    posts_serializer = PostListSerializer(
-        posts,
-        many=True,
-        context={"request": request},
-    )
-
-    return Response(
-        {
-            "category": category_serializer.data,
-            "posts": posts_serializer.data,
-        }
-    )
-
-
 @extend_schema(responses=PostListSerializer(many=True))
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
@@ -202,3 +171,27 @@ def recent_posts(request: Request) -> Response:
     )
 
     return Response(serializer.data)
+
+
+@extend_schema(responses=PostsByCategorySerializer)
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def posts_by_category(request: Request, category_slug: str) -> Response:
+    """Posts for defined category"""
+    category = get_object_or_404(Category, slug=category_slug)
+    posts = (
+        Post.objects.filter(category=category, publication_status=Post.PUBLISHED)
+        .select_related("author", "category")
+        .order_by("-created")
+    )
+
+    category_serializer = CategorySerializer(category)
+    posts_serializer = PostListSerializer(
+        posts,
+        many=True,
+        context={"request": request},
+    )
+
+    data = {"category": category_serializer.data, "posts": posts_serializer.data}
+
+    return Response(data)
