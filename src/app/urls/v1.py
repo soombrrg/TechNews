@@ -9,6 +9,7 @@ urlpatterns = [
     path("auth/", include("accounts.urls", namespace="auth")),
     path("posts/", include("main.urls", namespace="posts")),
     path("comments/", include("comments.urls", namespace="comments")),
+    path("subscribe/", include("subscribe.urls", namespace="subscribe")),
     # Swagger
     path(
         "docs/schema/",
