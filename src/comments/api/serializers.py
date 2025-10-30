@@ -1,8 +1,10 @@
 from typing import Any
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import ReturnDict
 
+from app.serializer import AuthorInfoSerializer
 from comments.models import Comment
 from main.models import Post
 
@@ -30,8 +32,8 @@ class CommentSerializer(serializers.ModelSerializer[Comment]):
         ]
         read_only_fields = ["author", "is_active"]
 
-    @staticmethod
-    def get_author_info(obj: Comment) -> dict[str, Any]:
+    @extend_schema_field(AuthorInfoSerializer)
+    def get_author_info(self, obj: Comment) -> dict[str, Any]:
         return {
             "id": obj.author.id,
             "username": obj.author.username,
@@ -97,9 +99,34 @@ class CommentDetailSerializer(CommentSerializer):
     class Meta(CommentSerializer.Meta):
         fields = CommentSerializer.Meta.fields + ["replies"]
 
+    @extend_schema_field(serializers.ListSerializer(child=CommentSerializer()))
     def get_replies(self, obj: Comment) -> ReturnDict | list[Any]:
         # Displaying replies only for main comments
         if obj.parent is None:
             replies = obj.replies.filter(is_active=True).order_by("created")
             return CommentSerializer(replies, many=True, context=self.context).data
         return []
+
+
+class PostDataSerializer(serializers.Serializer):
+    """Serializer for correct display of post data in OpenAPI."""
+
+    id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    slug = serializers.CharField(read_only=True)
+
+
+class PostCommentsSerializer(serializers.Serializer):
+    """Serializer for correct display of post_comments view response data in OpenAPI."""
+
+    post = PostDataSerializer(read_only=True)
+    comments = CommentSerializer(many=True, read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+
+
+class CommentRepliesSerializer(serializers.Serializer):
+    """Serializer for correct display of comment_replies view response data in OpenAPI."""
+
+    parent_comment = CommentSerializer(read_only=True)
+    replies = CommentSerializer(many=True, read_only=True)
+    replies_count = serializers.IntegerField(read_only=True)

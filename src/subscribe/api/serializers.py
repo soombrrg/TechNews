@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING, Any
 
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from app.serializer import AuthorInfoSerializer, PostInfoSerializer
 from subscribe.models import (
     PinnedPost,
     Subscription,
@@ -52,7 +54,7 @@ class SubscriptionSerializer(serializers.ModelSerializer[Subscription]):
     class Meta:
         model = Subscription
         fields = [
-            "id ",
+            "id",
             "user",
             "user_info",
             "plan",
@@ -60,6 +62,7 @@ class SubscriptionSerializer(serializers.ModelSerializer[Subscription]):
             "status",
             "start_date",
             "end_date",
+            "days_remaining",
             "auto_renew",
             "is_active",
             "created",
@@ -75,8 +78,8 @@ class SubscriptionSerializer(serializers.ModelSerializer[Subscription]):
             "modified",
         ]
 
-    @staticmethod
-    def get_user_info(obj: Subscription) -> dict[str, Any]:
+    @extend_schema_field(AuthorInfoSerializer)
+    def get_user_info(self, obj: Subscription) -> dict[str, Any]:
         """Returns info about user"""
         return {
             "id": obj.user.id,
@@ -134,17 +137,17 @@ class PinnedPostSerializer(serializers.ModelSerializer[PinnedPost]):
             "post_info",
             "pinned_at",
         ]
-        read_only_fields = ["id", "pinned_at"]
+        read_only_fields = ["id", "pinned_at", "post_info"]
 
-    @staticmethod
-    def get_post_info(obj: PinnedPost) -> dict[str, Any] | None:
+    @extend_schema_field(PostInfoSerializer)
+    def get_post_info(self, obj: PinnedPost) -> dict[str, Any] | None:
         """Returns info about post"""
         return {
             "id": obj.post.id,
             "title": obj.post.title,
             "slug": obj.post.slug,
             "content": obj.post.content,
-            "image": obj.post.image,
+            "image": obj.post.image.url if obj.post.image else None,
             "views_count": obj.post.views_count,
             "created": obj.post.created,
         }
@@ -256,21 +259,6 @@ class PostPinningSerializer(serializers.Serializer):
         if not hasattr(user, "subscription") or not user.subscription.is_active:
             raise serializers.ValidationError(
                 {"non_field_errors": ["Active subscription required to pin posts."]}
-            )
-
-        return attrs
-
-
-class PostUnpinningSerializer(serializers.Serializer):
-    """Serializer for post unpinning"""
-
-    def validate(self, attrs: dict[str, Any]) -> dict[str, Any] | None:
-        """General validation for post unpinning"""
-        user = self.context["request"].user
-
-        if not hasattr(user, "pinned_post"):
-            raise serializers.ValidationError(
-                {"non_field_errors": ["No pinned post found."]}
             )
 
         return attrs

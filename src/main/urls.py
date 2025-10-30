@@ -30,6 +30,6 @@ urlpatterns = [
     path("", PostListCreateView.as_view(), name="post-list"),
     path("recent/", recent_posts, name="recent-posts"),
     path("popular/", popular_posts, name="popular-posts"),
-    path("users-posts/", UsersPostsView.as_view(), name="users-posts"),
+    path("my-posts/", UsersPostsView.as_view(), name="my-posts"),
     path("<slug:slug>/", PostDetailView.as_view(), name="post-detail"),
 ]

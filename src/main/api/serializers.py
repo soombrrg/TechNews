@@ -1,8 +1,11 @@
 from typing import Any
 
 from django.utils.text import slugify
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from app.serializer import AuthorInfoSerializer, CategoryInfoSerializer
 from main.models import Category, Post
 
 
@@ -23,8 +26,8 @@ class CategorySerializer(serializers.ModelSerializer[Category]):
         ]
         read_only_fields = ["slug", "created"]
 
-    @staticmethod
-    def get_posts_count(obj: Category) -> int:
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_posts_count(self, obj: Category) -> int:
         return obj.posts.filter(publication_status=Post.PUBLISHED).count()
 
     def create(self, validated_data: dict[str, Any]) -> Category:
@@ -107,8 +110,8 @@ class PostDetailSerializer(serializers.ModelSerializer[Post]):
             data["content"] = data["content"][:200] + "..."
         return data
 
-    @staticmethod
-    def get_author_info(obj: Post) -> dict[str, Any]:
+    @extend_schema_field(AuthorInfoSerializer)
+    def get_author_info(self, obj: Post) -> dict[str, Any]:
         author = obj.author
         return {
             "id": author.id,
@@ -117,8 +120,8 @@ class PostDetailSerializer(serializers.ModelSerializer[Post]):
             "avatar": author.avatar.url if author.avatar else None,
         }
 
-    @staticmethod
-    def get_category_info(obj: Post) -> dict[str, Any] | None:
+    @extend_schema_field(CategoryInfoSerializer)
+    def get_category_info(self, obj: Post) -> dict[str, Any] | None:
         category = getattr(obj, "category", None)
         if category is not None:
             return {
@@ -151,3 +154,10 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer[Post]):
         if "title" in validated_data:
             validated_data["slug"] = slugify(validated_data["title"])
         return super().update(instance, validated_data)
+
+
+class PostsByCategorySerializer(serializers.Serializer):
+    """Serializer for correct display of posts_by_category view response data in OpenAPI."""
+
+    category = CategorySerializer(read_only=True)
+    posts = PostListSerializer(many=True, read_only=True)

@@ -17,6 +17,7 @@ from accounts.api.serializers import (
     UserProfileSerializer,
     UserRegistrationSerializer,
     UserUpdateSerializer,
+    RefreshTokenSerializer,
 )
 from accounts.models import User
 
@@ -114,19 +115,14 @@ class ChangePasswordView(generics.UpdateAPIView):
 
 
 @extend_schema(
-    request={
-        "application/json": {
-            "properties": {
-                "refresh_token": {
-                    "type": "string",
-                    "description": "Refresh token to blacklist",
-                }
-            },
-        }
-    },
+    request=RefreshTokenSerializer,
     responses={
-        200: {"properties": {"msg": {"type": "string"}}},
-        400: {"properties": {"error": {"type": "string"}}},
+        200: {
+            "properties": {
+                "msg": {"type": "string", "example": "Logged out successfully."}
+            }
+        },
+        400: {"properties": {"error": {"type": "string", "example": "Invalid token."}}},
     },
 )
 @api_view(["POST"])

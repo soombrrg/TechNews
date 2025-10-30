@@ -2,9 +2,17 @@ from typing import Any
 
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from accounts.models import User
+
+
+class RefreshTokenSerializer(serializers.Serializer):
+    """Serializer for correct refresh token display in OpenAPI."""
+
+    refresh_token = serializers.CharField(read_only=True)
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer[User]):
@@ -87,15 +95,15 @@ class UserProfileSerializer(serializers.ModelSerializer[User]):
         )
         read_only_fields = ("id", "created", "modified")
 
-    @staticmethod
-    def get_posts_count(obj: User) -> int:
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_posts_count(self, obj: User) -> int:
         try:
             return obj.posts.count()
         except AttributeError:
             return 0
 
-    @staticmethod
-    def get_comments_count(obj: User) -> int:
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_comments_count(self, obj: User) -> int:
         try:
             return obj.comments.count()
         except AttributeError:

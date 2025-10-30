@@ -15,8 +15,10 @@ from app.permissions import IsAuthorOrReadOnly
 from comments.api.serializers import (
     CommentCreateSerializer,
     CommentDetailSerializer,
+    CommentRepliesSerializer,
     CommentSerializer,
     CommentUpdateSerializer,
+    PostCommentsSerializer,
 )
 from comments.models import Comment
 from main.models import Post
@@ -96,17 +98,7 @@ class UsersCommentsView(generics.ListAPIView):
         )
 
 
-@extend_schema(
-    responses={
-        "post": {
-            "id": {"type": "int"},
-            "title": {"type": "string"},
-            "slug": {"type": "string"},
-        },
-        "comments": CommentSerializer(many=True),
-        "comments_count": {"type": "int"},
-    }
-)
+@extend_schema(responses={200: PostCommentsSerializer})
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def post_comments(request: Request, post_id: int) -> Response:
@@ -128,26 +120,20 @@ def post_comments(request: Request, post_id: int) -> Response:
     comments_serializer = CommentSerializer(
         comments, many=True, context={"request": request}
     )
-    return Response(
-        {
-            "post": {
-                "id": post.pk,
-                "title": post.title,
-                "slug": post.slug,
-            },
-            "comments": comments_serializer.data,
-            "comments_count": post.comments_count,
-        }
-    )
-
-
-@extend_schema(
-    responses={
-        "parent_comment": CommentSerializer(),
-        "replies": CommentSerializer(many=True),
-        "replies_count": {"type": "int"},
+    data = {
+        "post": {
+            "id": post.pk,
+            "title": post.title,
+            "slug": post.slug,
+        },
+        "comments": comments_serializer.data,
+        "comments_count": post.comments_count,
     }
-)
+
+    return Response(data)
+
+
+@extend_schema(responses={200: CommentRepliesSerializer})
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def comment_replies(request: Request, comment_id: int) -> Response:
@@ -167,10 +153,10 @@ def comment_replies(request: Request, comment_id: int) -> Response:
         replies, many=True, context={"request": request}
     )
 
-    return Response(
-        {
-            "parent_comment": parent_comment_serializer.data,
-            "replies": replies_serializer.data,
-            "replies_count": replies.count(),
-        }
-    )
+    data = {
+        "parent_comment": parent_comment_serializer.data,
+        "replies": replies_serializer.data,
+        "replies_count": len(replies),
+    }
+
+    return Response(data)
