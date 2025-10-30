@@ -5,14 +5,17 @@ from django.db import transaction
 from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from app.serializer import PinnedPostsListSerializer
 from main.models import Post
 from subscribe.api.serializers import (
     PinnedPostSerializer,
+    PostPinningSerializer,
     SubscriptionHistorySerializer,
     SubscriptionPlanSerializer,
     SubscriptionSerializer,
@@ -88,6 +91,10 @@ class SubscriptionHistoryView(generics.ListAPIView):
             if isinstance(self.request.user, AnonymousUser):
                 return SubscriptionHistory.objects.none()
 
+        # Check for Swagger Schema generating
+        if getattr(self, "swagger_fake_view", False):
+            return SubscriptionHistory.objects.none()
+
         try:
             subscription = self.request.user.subscription
             return subscription.history.all()
@@ -158,19 +165,58 @@ class PinnedPostView(generics.RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(responses={200: UserSubscriptionStatusSerializer})
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def subscription_status(request: Request) -> Response:
     """Returns current user's subscription status"""
-    serializer = UserSubscriptionStatusSerializer(request.user)
+    serializer = UserSubscriptionStatusSerializer(context={"request": request})
     return Response(serializer.data)
 
 
-@api_view(["GET"])
+@extend_schema(
+    request=PostPinningSerializer,
+    responses={
+        201: PinnedPostSerializer,
+        400: {"properties": {"error": {"type": "object"}}},
+        403: {
+            "oneOf": [
+                {
+                    "properties": {
+                        "error": {
+                            "type": "string",
+                            "example": "You can only pin your own posts.",
+                        }
+                    }
+                },
+                {
+                    "properties": {
+                        "error": {
+                            "type": "string",
+                            "example": "Active subscription required to pin posts.",
+                        }
+                    }
+                },
+            ]
+        },
+        404: {
+            "properties": {
+                "error": {"type": "string", "example": "Pinned post not found."}
+            }
+        },
+    },
+)
+@api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def pin_post(request: Request) -> Response:
     """Pins user`s post"""
-    serializer = PinnedPostSerializer(data=request.data, context={"request": request})
+
+    if TYPE_CHECKING:
+        # Explicit type check for MyPy
+        if isinstance(request.user, AnonymousUser):
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+    serializer = PostPinningSerializer(data=request.data, context={"request": request})
 
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -182,31 +228,9 @@ def pin_post(request: Request) -> Response:
                 Post, id=post_id, publication_status=Post.PUBLISHED
             )
 
-            # Check if authored by user
-            if post.author != request.user:
-                return Response(
-                    {"error": "You can only pin your own posts."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-            # Check subscription
-            if (
-                not hasattr(request.user, "subscription")
-                or not request.user.subscription.is_active
-            ):
-                return Response(
-                    {"error": "Active subscription required to pin posts."},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
             # Delete current pinned post if exist
             if hasattr(request.user, "pinned_post"):
                 request.user.pinned_post.delete()
-
-            if TYPE_CHECKING:
-                # Explicit type check for MyPy
-                if isinstance(request.user, AnonymousUser):
-                    return Response(status=status.HTTP_401_UNAUTHORIZED)
 
             pinned_post = PinnedPost.objects.create(
                 user=request.user,
@@ -224,19 +248,29 @@ def pin_post(request: Request) -> Response:
         )
 
 
-@api_view(["GET"])
+@extend_schema(
+    request={},
+    responses={
+        200: {
+            "properties": {
+                "msg": {"type": "string", "example": "Post unpinned successfully."}
+            }
+        },
+        404: {
+            "properties": {
+                "error": {"type": "string", "example": "Pinned post not found."}
+            }
+        },
+    },
+)
+@api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def unpin_post(request: Request) -> Response:
     """Unpins user`s post"""
-    serializer = PinnedPostSerializer(data=request.data, context={"request": request})
-
     if TYPE_CHECKING:
         # Explicit type check for MyPy
         if isinstance(request.user, AnonymousUser):
             return Response(status=status.HTTP_401_UNAUTHORIZED)
-
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         pinned_post = request.user.pinned_post
@@ -253,7 +287,30 @@ def unpin_post(request: Request) -> Response:
         )
 
 
-@api_view(["GET"])
+@extend_schema(
+    request={},
+    responses={
+        200: {
+            "properties": {
+                "msg": {
+                    "type": "string",
+                    "example": "Subscription cancelled successfully.",
+                }
+            },
+        },
+        400: {
+            "properties": {
+                "error": {"type": "string", "example": "No active subscription found."}
+            }
+        },
+        404: {
+            "properties": {
+                "error": {"type": "string", "example": "Subscription not found."}
+            }
+        },
+    },
+)
+@api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def cancel_subscription(request: Request) -> Response:
     """Cancel user`s subscription"""
@@ -279,7 +336,7 @@ def cancel_subscription(request: Request) -> Response:
             if hasattr(request.user, "pinned_post"):
                 request.user.pinned_post.delete()
 
-            # Write down in history
+            # Creating record in history
             SubscriptionHistory.objects.create(
                 subscription=subscription,
                 action=SubscriptionHistory.CANCELLED,
@@ -297,6 +354,7 @@ def cancel_subscription(request: Request) -> Response:
         )
 
 
+@extend_schema(responses={200: PinnedPostsListSerializer})
 @api_view(["GET"])
 @permission_classes([permissions.AllowAny])
 def pinned_posts_list(request: Request) -> Response:
@@ -317,7 +375,7 @@ def pinned_posts_list(request: Request) -> Response:
         .order_by("pinned_at")
     )
 
-    # Creating response with info about post
+    # Creating response with info of pinned posts
     posts_data = []
     for pinned_post in pinned_posts:
         post = pinned_post.post
@@ -337,6 +395,7 @@ def pinned_posts_list(request: Request) -> Response:
                     "id": post.author.id,
                     "username": post.author.username,
                     "full_name": post.author.full_name,
+                    "avatar": post.author.avatar.url if post.author.avatar else None,
                 },
                 "views_count": post.views_count,
                 "comments_count": post.comments_count,
@@ -354,12 +413,41 @@ def pinned_posts_list(request: Request) -> Response:
     )
 
 
+@extend_schema(
+    request={
+        "application/json": {
+            "properties": {
+                "post_id": {
+                    "type": "int",
+                }
+            },
+        }
+    },
+    responses={
+        200: {
+            "properties": {
+                "post_id": {"type": "integer"},
+                "can_pin": {"type": "boolean"},
+                "checks": {"type": "object"},
+                "msg": {"type": "string", "example": "Can pin post."},
+            }
+        },
+        404: {
+            "properties": {
+                "post_id": {"type": "integer"},
+                "can_pin": {"type": "boolean"},
+                "checks": {"properties": {"post_exists": {"type": "boolean"}}},
+                "msg": {"type": "string", "example": "Post not found."},
+            }
+        },
+    },
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def can_pin_post(request: Request, post_id: int) -> Response:
     """Check if user can pin post with given id"""
     try:
-        post = get_object_or_404(Post, id=post_id, publication_status=Post.PUBLISHED)
+        post = Post.objects.get(id=post_id, publication_status=Post.PUBLISHED)
 
         if TYPE_CHECKING:
             # Explicit type check for MyPy
