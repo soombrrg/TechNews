@@ -9,9 +9,8 @@ pytestmark = [pytest.mark.django_db]
 
 
 class TestRegistration:
-    @pytest.mark.xfail
     def test_register_get(self, api):
-        response = api.get(reverse("v1:auth:register"))
+        response = api.get(reverse("v1:auth:register"), expected_status_code=405)
 
     def test_register_post_w_invalid_data(self, api):
         data = {

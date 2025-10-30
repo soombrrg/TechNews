@@ -1,13 +1,20 @@
-from typing import Any
+from datetime import timedelta
 
 import pytest
 from django.contrib.auth.hashers import make_password
+from django.utils import timezone
 from mixer.backend.django import mixer as _mixer
 
 from accounts.models import User
 from app.test.api_clients import AppClient
 from comments.models import Comment
 from main.models import Category, Post
+from subscribe.models import (
+    PinnedPost,
+    Subscription,
+    SubscriptionHistory,
+    SubscriptionPlan,
+)
 
 
 @pytest.fixture
@@ -49,24 +56,30 @@ def comment(mixer, category: Category, user: User, post: Post) -> Comment:
 
 
 @pytest.fixture
-def category_factory(mixer):
-    def _factory(**kwargs: dict[str, Any]) -> Category:
-        return mixer.blend(Category, **kwargs)
-
-    return _factory
+def subscription_plan(mixer) -> SubscriptionPlan:
+    return mixer.blend(SubscriptionPlan)
 
 
 @pytest.fixture
-def post_factory(mixer):
-    def _factory(**kwargs: dict[str, Any]) -> Post:
-        return mixer.blend(Post, **kwargs)
-
-    return _factory
+def subscription(
+    mixer, user: User, subscription_plan: SubscriptionPlan
+) -> Subscription:
+    return mixer.blend(
+        Subscription,
+        user=user,
+        plan=subscription_plan,
+        status=Subscription.ACTIVE,
+        end_date=timezone.now() + timedelta(days=30),
+    )
 
 
 @pytest.fixture
-def comment_factory(mixer):
-    def _factory(**kwargs: dict[str, Any]) -> Comment:
-        return mixer.blend(Comment, **kwargs)
+def pinned_post(
+    mixer, user: User, subscription: Subscription, post: Post
+) -> PinnedPost:
+    return mixer.blend(PinnedPost, user=user, post=post)
 
-    return _factory
+
+@pytest.fixture
+def history(mixer, subscription: Subscription) -> SubscriptionHistory:
+    return mixer.blend(SubscriptionHistory, subscription=subscription)

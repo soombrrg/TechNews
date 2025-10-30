@@ -49,10 +49,10 @@ class TestPostList:
         assert response["title"] == "Test title"
         assert response["content"] == "Test content"
 
-    def test_get_w_users_draft(self, api, auth_user, post_factory):
+    def test_get_w_users_draft(self, api, auth_user, mixer):
         """Test getting posts with drafted, when User is author"""
-        post_1 = post_factory(author=auth_user, publication_status=Post.PUBLISHED)
-        post_2 = post_factory(author=auth_user, publication_status=Post.DRAFT)
+        post_1 = mixer.blend(Post, author=auth_user, publication_status=Post.PUBLISHED)
+        post_2 = mixer.blend(Post, author=auth_user, publication_status=Post.DRAFT)
 
         response = api.get(reverse("v1:posts:post-list"))
         response_results = response["results"]
@@ -65,10 +65,10 @@ class TestPostList:
 
         assert len(response_results) == 2
 
-    def test_get_w_draft_not_users(self, api, auth_user, post_factory):
+    def test_get_w_draft_not_users(self, api, auth_user, mixer):
         """Test not getting drafted post, when User is not author"""
-        post_1 = post_factory(publication_status=Post.PUBLISHED)
-        post_2 = post_factory(publication_status=Post.DRAFT)
+        post_1 = mixer.blend(Post, publication_status=Post.PUBLISHED)
+        post_2 = mixer.blend(Post, publication_status=Post.DRAFT)
 
         response = api.get(reverse("v1:posts:post-list"))
         response_results = response["results"]
@@ -89,10 +89,10 @@ class TestPostDetail:
         )
         assert response.status_code == 401
 
-    def test_permission_for_authenticated_but_not_author(
-        self, api, auth_user, post_factory
-    ):
-        post_1 = post_factory()
+    def test_permission_for_authenticated_but_not_author(self, api, auth_user, mixer):
+        post_1 = mixer.blend(
+            Post,
+        )
         response = api.api_client.patch(
             reverse("v1:posts:post-detail", kwargs={"slug": post_1.slug}),
             data={"content": "Test content"},
@@ -166,10 +166,10 @@ class TestRecentAndPopularPosts:
         response = api.get(reverse(f"v1:posts:{view_name}"))
         assert response == []
 
-    def test_get_fields(self, view_name, api, post_factory):
-        post_1 = post_factory(views_count=10, publication_status=Post.PUBLISHED)
-        post_2 = post_factory(views_count=5, publication_status=Post.PUBLISHED)
-        post_3 = post_factory(views_count=2, publication_status=Post.DRAFT)
+    def test_get_fields(self, view_name, api, mixer):
+        post_1 = mixer.blend(Post, views_count=10, publication_status=Post.PUBLISHED)
+        post_2 = mixer.blend(Post, views_count=5, publication_status=Post.PUBLISHED)
+        post_3 = mixer.blend(Post, views_count=2, publication_status=Post.DRAFT)
 
         response = api.get(reverse(f"v1:posts:{view_name}"))
 
@@ -192,12 +192,14 @@ class TestRecentAndPopularPosts:
 
         assert len(response) == 2
 
-    def test_get_more_then_10_posts(self, view_name, api, post_factory):
+    def test_get_more_then_10_posts(self, view_name, api, mixer):
         posts = []
         for i in range(40):
             posts.append(
-                post_factory(
-                    views_count=randint(0, 99999), publication_status=Post.PUBLISHED
+                mixer.blend(
+                    Post,
+                    views_count=randint(0, 99999),
+                    publication_status=Post.PUBLISHED,
                 )
             )
 
@@ -221,20 +223,20 @@ class TestRecentAndPopularPosts:
 class TestUsersPosts:
 
     def test_permission_for_not_authenticated(self, api, post):
-        response = api.get(reverse("v1:posts:users-posts"), expected_status_code=401)
+        response = api.get(reverse("v1:posts:my-posts"), expected_status_code=401)
 
         response = api.post(
-            reverse("v1:posts:users-posts"),
+            reverse("v1:posts:my-posts"),
             data={"content": "Test content"},
             expected_status_code=401,
         )
 
-    def test_get_fields(self, api, auth_user, post_factory):
-        post_1 = post_factory(publication_status=Post.PUBLISHED, author=auth_user)
-        post_2 = post_factory(publication_status=Post.DRAFT, author=auth_user)
-        post_3 = post_factory(publication_status=Post.DRAFT)
+    def test_get_fields(self, api, auth_user, mixer):
+        post_1 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=auth_user)
+        post_2 = mixer.blend(Post, publication_status=Post.DRAFT, author=auth_user)
+        post_3 = mixer.blend(Post, publication_status=Post.DRAFT)
 
-        response = api.get(reverse(f"v1:posts:users-posts"))
+        response = api.get(reverse(f"v1:posts:my-posts"))
         response_results = response["results"]
 
         # Test response fields

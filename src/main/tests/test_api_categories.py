@@ -2,7 +2,7 @@ import pytest
 from django.urls import reverse
 
 from main.api.serializers import CategorySerializer, PostListSerializer
-from main.models import Category
+from main.models import Category, Post
 
 pytestmark = [pytest.mark.django_db]
 
@@ -13,8 +13,8 @@ class TestCategoryList:
 
         response = api.post(reverse("v1:posts:category-list"), expected_status_code=401)
 
-    def test_get_fields(self, api, category_factory):
-        category_1 = category_factory(name="Category 1", description="ABC")
+    def test_get_fields(self, api, mixer):
+        category_1 = mixer.blend(Category, name="Category 1", description="ABC")
 
         response = api.get(reverse("v1:posts:category-list"))
         response_results = response.get("results")
@@ -25,9 +25,9 @@ class TestCategoryList:
         for field in expected_fields:
             assert field in response_results[0]
 
-    def test_response_ordering(self, api, category_factory):
-        category_1 = category_factory(name="Category 1", description="ABC")
-        category_2 = category_factory(name="Category 2", description="DEF")
+    def test_response_ordering(self, api, mixer):
+        category_1 = mixer.blend(Category, name="Category 1", description="ABC")
+        category_2 = mixer.blend(Category, name="Category 2", description="DEF")
 
         response = api.get(reverse("v1:posts:category-list"))
         response_results = response.get("results")
@@ -42,9 +42,9 @@ class TestCategoryList:
         assert response_results[1]["name"] == category_1.name
         assert response_results[0]["name"] == category_2.name
 
-    def test_response_search(self, api, category_factory):
-        category_1 = category_factory(name="Category 1", description="ABC")
-        category_2 = category_factory(name="Category 2", description="DEF")
+    def test_response_search(self, api, mixer):
+        category_1 = mixer.blend(Category, name="Category 1", description="ABC")
+        category_2 = mixer.blend(Category, name="Category 2", description="DEF")
 
         response = api.get(reverse("v1:posts:category-list") + "?search=f")
         response_results = response.get("results")
@@ -139,8 +139,8 @@ class TestPostsByCategory:
             expected_status_code=404,
         )
 
-    def test_not_valid_method(self, api, category, post_factory):
-        post_1 = post_factory(category=category)
+    def test_not_valid_method(self, api, category, mixer):
+        post_1 = mixer.blend(Post, category=category)
 
         response = api.post(
             reverse(
@@ -149,10 +149,12 @@ class TestPostsByCategory:
             expected_status_code=405,
         )
 
-    def test_get(self, api, category, post_factory):
-        post_1 = post_factory(category=category)
-        post_2 = post_factory(category=category)
-        post_no_category = post_factory()
+    def test_get(self, api, category, mixer):
+        post_1 = mixer.blend(Post, category=category)
+        post_2 = mixer.blend(Post, category=category)
+        post_no_category = mixer.blend(
+            Post,
+        )
 
         response = api.get(
             reverse(

@@ -58,12 +58,16 @@ class TestCommentListCreate:
         for field in expected_fields:
             assert field in response
 
-    def test_returning_only_active(self, api, post, comment_factory):
-        comment_1 = comment_factory(
-            post=post, content="Test content 1", is_active=False
+    def test_returning_only_active(self, api, post, mixer):
+        comment_1 = mixer.blend(
+            Comment, post=post, content="Test content 1", is_active=False
         )
-        comment_2 = comment_factory(post=post, content="Test content 2", is_active=True)
-        comment_3 = comment_factory(post=post, content="Test content 3", is_active=True)
+        comment_2 = mixer.blend(
+            Comment, post=post, content="Test content 2", is_active=True
+        )
+        comment_3 = mixer.blend(
+            Comment, post=post, content="Test content 3", is_active=True
+        )
 
         response = api.get(reverse("v1:comments:comment-list"))
         response_results = response["results"]
@@ -88,10 +92,10 @@ class TestCommentDetail:
         )
         assert response.status_code == 401
 
-    def test_permission_for_authenticated_but_not_author(
-        self, api, auth_user, comment_factory
-    ):
-        comment_1 = comment_factory()
+    def test_permission_for_authenticated_but_not_author(self, api, auth_user, mixer):
+        comment_1 = mixer.blend(
+            Comment,
+        )
         response = api.api_client.patch(
             reverse("v1:comments:comment-detail", kwargs={"pk": comment_1.pk}),
             data={"content": "Test content"},
@@ -108,9 +112,9 @@ class TestCommentDetail:
         for field in expected_fields:
             assert field in response
 
-    def test_only_active(self, api, auth_user, comment_factory, post):
-        comment_1 = comment_factory(
-            post=post, content="Test content 1", is_active=False
+    def test_only_active(self, api, auth_user, mixer, post):
+        comment_1 = mixer.blend(
+            Comment, post=post, content="Test content 1", is_active=False
         )
         response = api.get(
             reverse("v1:comments:comment-detail", kwargs={"pk": comment_1.pk}),
@@ -185,20 +189,23 @@ class TestUsersComments:
         for field in expected_fields:
             assert field in response_results[0]
 
-    def test_returning_all_authored(self, api, auth_user, post, comment_factory):
-        comment_1 = comment_factory(
+    def test_returning_all_authored(self, api, auth_user, post, mixer):
+        comment_1 = mixer.blend(
+            Comment,
             post=post,
             content="Test content 1",
             author=auth_user,
             is_active=False,
         )
-        comment_2 = comment_factory(
+        comment_2 = mixer.blend(
+            Comment,
             post=post,
             content="Test content 2",
             author=auth_user,
             is_active=False,
         )
-        comment_3 = comment_factory(
+        comment_3 = mixer.blend(
+            Comment,
             post=post,
             content="Test content 3",
             author=auth_user,
@@ -228,19 +235,23 @@ class TestPostComments:
             expected_status_code=405,
         )
 
-    def test_comments_for_draft_post(self, api, auth_user, post_factory, comment):
-        post_1 = post_factory(publication_status=Post.DRAFT)
+    def test_comments_for_draft_post(self, api, auth_user, mixer, comment):
+        post_1 = mixer.blend(Post, publication_status=Post.DRAFT)
         response = api.get(
             reverse("v1:comments:post-comments", kwargs={"post_id": post_1.pk}),
             expected_status_code=404,
         )
 
-    def test_successful_response(self, api, auth_user, comment_factory, post):
-        comment_1 = comment_factory(post=post, content="Test content 1", is_active=True)
-        comment_2 = comment_factory(
-            post=post, content="Test content 2", is_active=False
+    def test_successful_response(self, api, auth_user, mixer, post):
+        comment_1 = mixer.blend(
+            Comment, post=post, content="Test content 1", is_active=True
         )
-        comment_3 = comment_factory(post=post, content="Test content 3", is_active=True)
+        comment_2 = mixer.blend(
+            Comment, post=post, content="Test content 2", is_active=False
+        )
+        comment_3 = mixer.blend(
+            Comment, post=post, content="Test content 3", is_active=True
+        )
 
         response = api.get(
             reverse("v1:comments:post-comments", kwargs={"post_id": post.pk}),
@@ -275,12 +286,16 @@ class TestCommentReplies:
             expected_status_code=405,
         )
 
-    def test_replies_for_inactive_comment(self, api, auth_user, comment_factory, post):
-        comment_1 = comment_factory(
-            post=post, content="Test co1ntent 1", is_active=False
+    def test_replies_for_inactive_comment(self, api, auth_user, mixer, post):
+        comment_1 = mixer.blend(
+            Comment, post=post, content="Test co1ntent 1", is_active=False
         )
-        comment_2 = comment_factory(
-            post=post, content="Test content 2", is_active=True, parent=comment_1
+        comment_2 = mixer.blend(
+            Comment,
+            post=post,
+            content="Test content 2",
+            is_active=True,
+            parent=comment_1,
         )
         # Should still be shown
         response = api.get(
@@ -290,16 +305,28 @@ class TestCommentReplies:
         assert response["replies"][0]["content"] == comment_2.content
         assert response["replies"][0]["author"] == str(comment_2.author.id)
 
-    def test_successful_response(self, api, auth_user, comment_factory, post):
-        comment_1 = comment_factory(post=post, content="Test content 1")
-        comment_2 = comment_factory(
-            post=post, content="Test content ", is_active=False, parent=comment_1
+    def test_successful_response(self, api, auth_user, mixer, post):
+        comment_1 = mixer.blend(Comment, post=post, content="Test content 1")
+        comment_2 = mixer.blend(
+            Comment,
+            post=post,
+            content="Test content ",
+            is_active=False,
+            parent=comment_1,
         )
-        comment_3 = comment_factory(
-            post=post, content="Test content 3", is_active=True, parent=comment_1
+        comment_3 = mixer.blend(
+            Comment,
+            post=post,
+            content="Test content 3",
+            is_active=True,
+            parent=comment_1,
         )
-        comment_4 = comment_factory(
-            post=post, content="Test content 4", is_active=True, parent=comment_1
+        comment_4 = mixer.blend(
+            Comment,
+            post=post,
+            content="Test content 4",
+            is_active=True,
+            parent=comment_1,
         )
 
         response = api.get(
