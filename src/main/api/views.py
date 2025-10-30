@@ -14,10 +14,10 @@ from rest_framework.serializers import Serializer
 from app.permissions import IsAuthorOrReadOnly
 from main.api.serializers import (
     CategorySerializer,
-    PostsByCategorySerializer,
     PostCreateUpdateSerializer,
     PostDetailSerializer,
     PostListSerializer,
+    PostsByCategorySerializer,
 )
 from main.models import Category, Post
 

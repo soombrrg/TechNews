@@ -13,11 +13,11 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.api.serializers import (
     ChangePasswordSerializer,
+    RefreshTokenSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
     UserRegistrationSerializer,
     UserUpdateSerializer,
-    RefreshTokenSerializer,
 )
 from accounts.models import User
 
