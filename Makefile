@@ -4,7 +4,7 @@ deps:
 	uv sync
 
 fmt:
-	uv run uv run black src
+	uv run black src
 	uv run isort src
 
 lint:
@@ -28,5 +28,3 @@ up-prod: fmt lint
 
 build:
 	docker build -t test .
-
-

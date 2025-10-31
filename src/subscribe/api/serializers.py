@@ -13,7 +13,6 @@ from subscribe.models import (
 )
 
 if TYPE_CHECKING:
-
     from main.models import Post
 
 

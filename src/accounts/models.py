@@ -6,7 +6,7 @@ from django.db import models
 from app.models import TimeStampedModel
 
 
-class User(AbstractUser, TimeStampedModel):  # type: ignore[django-manager-missing]
+class User(AbstractUser, TimeStampedModel):
     """Custom User model"""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
