@@ -1,11 +1,10 @@
 from typing import TYPE_CHECKING, Any, Type
 
-from django.contrib.auth.models import AnonymousUser
 from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
-from rest_framework import filters, generics, permissions
+from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -14,12 +13,18 @@ from rest_framework.serializers import Serializer
 from app.permissions import IsAuthorOrReadOnly
 from main.api.serializers import (
     CategorySerializer,
+    FeaturedPostsSerializer,
     PostCreateUpdateSerializer,
     PostDetailSerializer,
     PostListSerializer,
     PostsByCategorySerializer,
+    TogglePostPinStatusSerializer,
+    PinnedPostsOnlySerializer,
 )
 from main.models import Category, Post
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import AnonymousUser
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
@@ -44,7 +49,10 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class PostListCreateView(generics.ListCreateAPIView):
-    """Api endpoint for listing and creating Posts"""
+    """
+    Api endpoint for listing and creating Posts with support for pinned posts.
+    Pinned posts displayed first in "pinned_at" order.
+    """
 
     serializer_class = PostListSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -60,6 +68,11 @@ class PostListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self) -> QuerySet[Post]:
         """Returning posts, depending on access right"""
+
+        # Check for Swagger Schema generating
+        if getattr(self, "swagger_fake_view", False):
+            return Post.objects.none()
+
         queryset = Post.objects.select_related("author", "category")
 
         # Filter using access right
@@ -69,12 +82,39 @@ class PostListCreateView(generics.ListCreateAPIView):
             queryset = queryset.filter(
                 Q(publication_status=Post.PUBLISHED) | Q(author=self.request.user)
             )
+
+        # Check if ordering with dependence on pinned posts
+        ordering = self.request.query_params.get("ordering", "")
+        show_pinned_first = not ordering or ordering in ["-created", "created"]
+
+        if show_pinned_first:
+            return Post.get_posts_for_feed().filter(
+                Q(publication_status=Post.PUBLISHED)
+                | (
+                    Q(author=self.request.user)
+                    if self.request.user.is_authenticated
+                    else Q()
+                )
+            )
+
         return queryset
 
     def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method == "POST":
             return PostCreateUpdateSerializer
         return PostListSerializer
+
+    def list(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        response = super().list(request, *args, **kwargs)
+
+        # Adding Pinned posts stats
+        if hasattr(response, "data") and "results" in response.data:
+            pinned_count = sum(
+                1 for post in response.data["results"] if post.get("is_pinned", False)
+            )
+            response.data["pinned_posts_count"] = pinned_count
+
+        return response
 
 
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -139,8 +179,8 @@ class UsersPostsView(generics.ListAPIView):
 def popular_posts(request: Request) -> Response:
     """10 most popular Posts"""
     posts = (
-        Post.objects.filter(publication_status=Post.PUBLISHED)
-        .select_related("author", "category")
+        Post.objects.with_subscription_info()
+        .filter(publication_status=Post.PUBLISHED)
         .order_by("-views_count")[:10]
     )
 
@@ -159,8 +199,8 @@ def popular_posts(request: Request) -> Response:
 def recent_posts(request: Request) -> Response:
     """10 most recent Posts"""
     posts = (
-        Post.objects.filter(publication_status=Post.PUBLISHED)
-        .select_related("author", "category")
+        Post.objects.with_subscription_info()
+        .filter(publication_status=Post.PUBLISHED)
         .order_by("-created")[:10]
     )
 
@@ -179,10 +219,45 @@ def recent_posts(request: Request) -> Response:
 def posts_by_category(request: Request, category_slug: str) -> Response:
     """Posts for defined category"""
     category = get_object_or_404(Category, slug=category_slug)
-    posts = (
-        Post.objects.filter(category=category, publication_status=Post.PUBLISHED)
-        .select_related("author", "category")
-        .order_by("-created")
+
+    # Retrieving posts depending on pinning
+    posts = Post.objects.with_subscription_info().filter(
+        category=category,
+        publication_status=Post.PUBLISHED,
+    )
+
+    # Sorting depending on pinned post
+    # Using annotate for correct ordering
+    from django.db.models import BooleanField, Case, DateTimeField, Value, When  # noqa
+    from django.utils import timezone  # noqa
+
+    from subscribe.models import Subscription  # noqa
+
+    posts = posts.annotate(
+        effective_date=Case(
+            When(
+                pin_info__isnull=False,
+                pin_info__user__subscription__status=Subscription.ACTIVE,
+                pin_info__user__subscription__end_date__gt=timezone.now(),
+                then="pin_info__pinned_at",
+            ),
+            default="created",
+            output_field=DateTimeField(),
+        ),
+        is_pinned_flag=Case(
+            When(
+                pin_info__isnull=False,
+                pin_info__user__subscription__status=Subscription.ACTIVE,
+                pin_info__user__subscription__end_date__gt=timezone.now(),
+                then=Value(True),
+            ),
+            default=Value(True),
+            output_field=BooleanField(),
+        ),
+    ).order_by(
+        "-is_pinned_flag",
+        "effective_date",
+        "-created",
     )
 
     category_serializer = CategorySerializer(category)
@@ -192,6 +267,145 @@ def posts_by_category(request: Request, category_slug: str) -> Response:
         context={"request": request},
     )
 
-    data = {"category": category_serializer.data, "posts": posts_serializer.data}
+    data = {
+        "category": category_serializer.data,
+        "posts": posts_serializer.data,
+        "pinned_posts_count": sum(
+            1 for post in posts_serializer.data if post.get("is_pinned", False)
+        ),
+    }
 
     return Response(data)
+
+
+@extend_schema(responses=PinnedPostsOnlySerializer)
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def pinned_posts_only(request: Request) -> Response:
+    """Return pinned posts"""
+    pinned_posts = Post.objects.pinned()
+    serializer = PostListSerializer(
+        pinned_posts, many=True, context={"request": request}
+    )
+    return Response(
+        {
+            "count": len(pinned_posts),
+            "results": serializer.data,
+        }
+    )
+
+
+@extend_schema(responses=FeaturedPostsSerializer)
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def featured_posts(request: Request) -> Response:
+    """
+    Recommended posts for main page:
+    - Pinned posts (3 max)
+    - Popular posts for last week
+    """
+    from datetime import timedelta  # noqa
+
+    from django.utils import timezone  # noqa
+
+    # Retrieving last 3 pinned posts
+    pinned_posts = Post.objects.pinned()[:3]
+
+    # Retrieving popular posts (excluding pinned)
+    week_ago = timezone.now() - timedelta(days=7)
+    popular_posts_of_week = (
+        Post.objects.with_subscription_info()
+        .filter(
+            publication_status=Post.PUBLISHED,
+            created__gte=week_ago,
+        )
+        .exclude(
+            id__in=[post.id for post in pinned_posts],
+        )
+        .order_by("-views_count")[:6]
+    )
+
+    pinned_serializer = PostListSerializer(
+        pinned_posts,
+        many=True,
+        context={"request": request},
+    )
+    popular_serializer = PostListSerializer(
+        popular_posts_of_week,
+        many=True,
+        context={"request": request},
+    )
+
+    data = {
+        "pinned": pinned_serializer.data,
+        "popular_posts": popular_serializer.data,
+        "total_pinned": Post.objects.pinned().count(),
+    }
+
+    return Response(data)
+
+
+@extend_schema(
+    request={"application/json": {"properties": {"slug": {"type": "string"}}}},
+    responses={
+        404: {"properties": {"error": {"type": "string"}}},
+        403: {"properties": {"error": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+        200: TogglePostPinStatusSerializer,
+    },
+)
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_post_pin_status(request: Request, slug: str) -> Response:
+    """Toggle pinned post status"""
+    if TYPE_CHECKING:
+        # Explicit type check for MyPy
+        if isinstance(request.user, AnonymousUser):
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+    post = get_object_or_404(
+        Post, slug=slug, author=request.user, status=Post.PUBLISHED
+    )
+
+    if (
+        not hasattr(request.user, "subscription")
+        or not request.user.subscription.is_active
+    ):
+        return Response(
+            {"error": "Active subscription required to pin posts"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        from django.db import transaction  # noqa
+
+        from subscribe.models import PinnedPost  # noqa
+
+        with transaction.atomic():
+            if post.is_pinned:
+                # Unpin if exists
+                post.pin_info.delete()
+                msg = "Post unpinned successfully"
+                is_pinned = False
+            else:
+                # Deleting users existing pinned post before creating new
+                if hasattr(request.user, "pinned_post"):
+                    request.user.pinned_post.delete()
+
+                # Creating new pinned post
+                PinnedPost.objects.create(user=request.user, post=post)
+                msg = "Post pinned successfully"
+                is_pinned = True
+        return Response(
+            {
+                "msg": msg,
+                "is_pinned": is_pinned,
+                "post": PostDetailSerializer(post, context={"request": request}).data,
+            },
+        )
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
