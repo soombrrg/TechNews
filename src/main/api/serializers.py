@@ -69,6 +69,7 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
         return obj.get_pinned_info()
 
     def create(self, validated_data: dict[str, Any]) -> Post:
+        validated_data["author"] = self.context["request"].user
         validated_data["slug"] = slugify(validated_data["name"])
         return super().create(validated_data)
 
@@ -179,6 +180,31 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer[Post]):
         if "title" in validated_data:
             validated_data["slug"] = slugify(validated_data["title"])
         return super().update(instance, validated_data)
+
+
+class PostPinningSerializer(serializers.Serializer):
+    """Serializer for post pinning"""
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any] | None:
+        """General validation"""
+        user = self.context["request"].user
+        post = self.context["post"]
+
+        # Check if user have active subscription
+        if not hasattr(user, "subscription") or not user.subscription.is_active:
+            raise serializers.ValidationError(
+                {"non_field_errors": ["Active subscription required to pin posts."]}
+            )
+
+        # Check if post is authored by user
+        if post.author != user:
+            raise serializers.ValidationError("You can only pin your own posts.")
+
+        # Check if post is published
+        if post.publication_status != Post.PUBLISHED:
+            raise serializers.ValidationError("Only published posts can be pinned.")
+
+        return attrs
 
 
 class PostsByCategorySerializer(serializers.Serializer):

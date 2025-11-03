@@ -228,36 +228,3 @@ class UserSubscriptionStatusSerializer(serializers.Serializer):
                 PinnedPostSerializer(pinned_post).data if pinned_post else None
             ),
         }
-
-
-class PostPinningSerializer(serializers.Serializer):
-    """Serializer for post pinning"""
-
-    post_id = serializers.IntegerField()
-
-    def validate_post_id(self, value: int) -> int:
-        """Validates post id"""
-        from main.models import Post
-
-        try:
-            post = Post.objects.get(id=value, publication_status=Post.PUBLISHED)
-        except Post.DoesNotExist:
-            raise serializers.ValidationError("Post not found or not published.")
-
-        user = self.context["request"].user
-        if post.author != user:
-            raise serializers.ValidationError("You can only pin your own posts.")
-
-        return value
-
-    def validate(self, attrs: dict[str, Any]) -> dict[str, Any] | None:
-        """General validation"""
-        user = self.context["request"].user
-
-        # Check subscription
-        if not hasattr(user, "subscription") or not user.subscription.is_active:
-            raise serializers.ValidationError(
-                {"non_field_errors": ["Active subscription required to pin posts."]}
-            )
-
-        return attrs

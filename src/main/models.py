@@ -52,7 +52,7 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
                 "pin_info__user",
                 "pin_info__user__subscription",
             )
-            .order_by("pinned_at")
+            .order_by("pin_info__pinned_at")
         )
 
     def regular_posts(self) -> QuerySet["Post"]:
@@ -68,6 +68,34 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
             "author__subscription",
             "category",
         ).prefetch_related("pin_info")
+
+    def for_feed(self, *args: Any, **kwargs: Any) -> QuerySet["Post"]:
+        """Return a queryset of pinned and unpinned posts in "pinned_at" or "-created" order"""
+        queryset = self.filter(publication_status=PublishedModel.PUBLISHED)
+        if args or kwargs:
+            queryset = self.filter(*args, **kwargs)
+
+        from django.db.models import Case, When, Value, IntegerField
+
+        return (
+            queryset.select_related(
+                "author",
+                "category",
+                "pin_info",
+                "pin_info__user",
+                "pin_info__user__subscription",
+            )
+            .annotate(
+                # Annotate for sort order: pinned posts first, then by created
+                post_type_order=Case(
+                    When(pin_info__isnull=False, then=Value(1)),  # Pinned posts
+                    When(pin_info__isnull=True, then=Value(2)),  # Regular posts
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("post_type_order", "pin_info__pinned_at", "-created")
+        )
 
 
 class Post(SluggedModel, PublishedModel, TimeStampedModel):

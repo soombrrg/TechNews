@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from django.db.models import QuerySet
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
@@ -15,7 +14,6 @@ from app.serializer import PinnedPostsListSerializer
 from main.models import Post
 from subscribe.api.serializers import (
     PinnedPostSerializer,
-    PostPinningSerializer,
     SubscriptionHistorySerializer,
     SubscriptionPlanSerializer,
     SubscriptionSerializer,
@@ -172,119 +170,6 @@ def subscription_status(request: Request) -> Response:
     """Returns current user's subscription status"""
     serializer = UserSubscriptionStatusSerializer(context={"request": request})
     return Response(serializer.data)
-
-
-@extend_schema(
-    request=PostPinningSerializer,
-    responses={
-        201: PinnedPostSerializer,
-        400: {"properties": {"error": {"type": "object"}}},
-        403: {
-            "oneOf": [
-                {
-                    "properties": {
-                        "error": {
-                            "type": "string",
-                            "example": "You can only pin your own posts.",
-                        }
-                    }
-                },
-                {
-                    "properties": {
-                        "error": {
-                            "type": "string",
-                            "example": "Active subscription required to pin posts.",
-                        }
-                    }
-                },
-            ]
-        },
-        404: {
-            "properties": {
-                "error": {"type": "string", "example": "Pinned post not found."}
-            }
-        },
-    },
-)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def pin_post(request: Request) -> Response:
-    """Pins user`s post"""
-
-    if TYPE_CHECKING:
-        # Explicit type check for MyPy
-        if isinstance(request.user, AnonymousUser):
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
-
-    serializer = PostPinningSerializer(data=request.data, context={"request": request})
-
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    post_id = serializer.validated_data["post_id"]
-    try:
-        with transaction.atomic():
-            post = get_object_or_404(
-                Post, id=post_id, publication_status=Post.PUBLISHED
-            )
-
-            # Delete current pinned post if exist
-            if hasattr(request.user, "pinned_post"):
-                request.user.pinned_post.delete()
-
-            pinned_post = PinnedPost.objects.create(
-                user=request.user,
-                post=post,
-            )
-            response_serializer = PinnedPostSerializer(pinned_post)
-            return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED,
-            )
-    except Exception as e:
-        return Response(
-            {"error": str(e)},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-
-@extend_schema(
-    request={},
-    responses={
-        200: {
-            "properties": {
-                "msg": {"type": "string", "example": "Post unpinned successfully."}
-            }
-        },
-        404: {
-            "properties": {
-                "error": {"type": "string", "example": "Pinned post not found."}
-            }
-        },
-    },
-)
-@api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
-def unpin_post(request: Request) -> Response:
-    """Unpins user`s post"""
-    if TYPE_CHECKING:
-        # Explicit type check for MyPy
-        if isinstance(request.user, AnonymousUser):
-            return Response(status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        pinned_post = request.user.pinned_post
-        pinned_post.delete()
-
-        return Response(
-            {"msg": "Post unpinned successfully"},
-            status=status.HTTP_200_OK,
-        )
-    except PinnedPost.DoesNotExist:
-        return Response(
-            {"error": "Pinned post not found."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
 
 
 @extend_schema(
