@@ -157,7 +157,7 @@ class PinnedPost(models.Model):
 
         # Check that post belongs to user
         if self.post.author != self.user:
-            raise ValueError("You can only pin there own posts.")
+            raise ValueError("User can only pin there own posts.")
 
         super().save(*args, **kwargs)
 
