@@ -4,12 +4,14 @@ import pytest
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 
+from accounts.models import User
 from main.api.serializers import (
     PostCreateUpdateSerializer,
     PostDetailSerializer,
     PostListSerializer,
 )
 from main.models import Post
+from subscribe.models import PinnedPost
 
 pytestmark = [pytest.mark.django_db]
 
@@ -250,3 +252,153 @@ class TestUsersPosts:
         assert response_results[1]["title"] == post_1.title
 
         assert len(response_results) == response["count"] == 2
+
+
+class TestPinnedPostsOnly:
+    def test_get_only(self, api, post):
+        response = api.get(reverse(f"v1:posts:pinned-posts-only"))
+
+        response = api.post(
+            reverse(f"v1:posts:pinned-posts-only"), expected_status_code=405
+        )
+
+    def test_get_fields(
+        self, api, auth_user, subscription, subscribed_user_factory, mixer
+    ):
+        user_1 = subscribed_user_factory()
+        user_2 = subscribed_user_factory()
+
+        post_1 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=auth_user)
+        post_2 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=user_1)
+        post_3 = mixer.blend(Post, publication_status=Post.DRAFT, author=user_2)
+        post_not_pinned = mixer.blend(Post, publication_status=Post.PUBLISHED)
+
+        p_post_1 = mixer.blend(PinnedPost, user=auth_user, post=post_1)
+        p_post_2 = mixer.blend(PinnedPost, user=user_1, post=post_2)
+        p_post_3 = mixer.blend(PinnedPost, user=user_2, post=post_3)
+
+        response = api.get(reverse(f"v1:posts:pinned-posts-only"))
+        response_results = response["results"]
+
+        serializer = PostListSerializer()
+        expected_fields = serializer.fields
+
+        for field in expected_fields:
+            assert field in response_results[0]
+
+        # Only Published should be shown
+        assert response["count"] == 2
+
+
+class TestFeaturedPosts:
+    def test_get_only(self, api, post):
+        response = api.get(reverse(f"v1:posts:featured-posts"))
+
+        response = api.post(
+            reverse(f"v1:posts:featured-posts"), expected_status_code=405
+        )
+
+    def test_get_fields(
+        self, api, auth_user, subscription, subscribed_user_factory, mixer
+    ):
+        user_1 = subscribed_user_factory()
+
+        post_1 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=auth_user)
+        post_2 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=user_1)
+        post_3 = mixer.blend(Post, publication_status=Post.PUBLISHED, author=auth_user)
+        post_4 = mixer.blend(Post, publication_status=Post.DRAFT, author=user_1)
+        post_not_pinned = mixer.blend(Post, publication_status=Post.DRAFT)
+
+        p_post_1 = mixer.blend(PinnedPost, user=auth_user, post=post_1)
+        p_post_2 = mixer.blend(PinnedPost, user=user_1, post=post_2)
+
+        response = api.get(reverse(f"v1:posts:featured-posts"))
+
+        serializer = PostListSerializer()
+
+        expected_fields = serializer.fields
+
+        for field in expected_fields:
+            assert field in response["pinned"][0]
+            assert field in response["popular"][0]
+
+        assert response["total_pinned"] == Post.objects.pinned().count()
+
+        assert len(response["pinned"]) == 2  # p_post_1, p_post_2
+        assert len(response["popular"]) == 1  # post_3
+
+
+class TestTogglePinStatus:
+    def test_permission_not_authenticated(self, api, post):
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[post.slug]),
+            expected_status_code=401,
+        )
+
+    def test_only_post(self, api, auth_user, subscription, post):
+        response = api.get(
+            reverse("v1:main:toggle-pin-status", args=[post.slug]),
+            expected_status_code=405,
+        )
+
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[post.slug]),
+        )
+
+    def test_no_subscription(self, api, auth_user, post):
+        # User should have active subscription
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[post.slug]),
+            expected_status_code=400,  # On validation error
+        )
+        assert response["non_field_errors"]
+
+    def test_no_post(self, api, auth_user, subscription):
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[1]),
+            expected_status_code=404,
+        )
+
+    def test_not_authored(self, api, auth_user, subscription, category, mixer):
+        user_1 = mixer.blend(User)
+        post_1 = mixer.blend(Post, author=user_1, category=category)
+
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[post_1.slug]),
+            expected_status_code=400,
+        )
+        # Post should be authored by User
+        assert response["non_field_errors"]
+
+    def test_pin_success(self, api, auth_user, subscription, post):
+        p_post_exists = PinnedPost.objects.filter(user=auth_user, post=post).exists()
+        assert not p_post_exists
+
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[post.slug]),
+        )
+        response_post = response["post"]
+        p_post = PinnedPost.objects.filter(user=auth_user, post=post)
+
+        serializer = PostDetailSerializer()
+        expected_fields = serializer.fields
+
+        for field in expected_fields:
+            assert field in response_post
+
+        assert p_post
+        assert response["msg"]
+        assert response["is_pinned"] == True
+
+    def test_unpin_success(self, api, auth_user, subscription, pinned_post):
+        p_post = PinnedPost.objects.get(user=auth_user)
+        assert p_post.post == pinned_post.post
+
+        response = api.post(
+            reverse("v1:main:toggle-pin-status", args=[pinned_post.post.slug])
+        )
+        p_post_exists = PinnedPost.objects.filter(user=auth_user).exists()
+
+        assert not p_post_exists
+        assert response["msg"]
+        assert response["is_pinned"] == False

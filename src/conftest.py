@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Any
 
 import pytest
 from django.contrib.auth.hashers import make_password
@@ -83,3 +84,19 @@ def pinned_post(
 @pytest.fixture
 def history(mixer, subscription: Subscription) -> SubscriptionHistory:
     return mixer.blend(SubscriptionHistory, subscription=subscription)
+
+
+@pytest.fixture
+def subscribed_user_factory(mixer, subscription_plan):
+    def _factory(**kwargs: dict[str, Any]) -> User:
+        sub_user = mixer.blend(User)
+        subscription = mixer.blend(
+            Subscription,
+            user=sub_user,
+            plan=subscription_plan,
+            status=Subscription.ACTIVE,
+            end_date=timezone.now() + timedelta(days=30),
+        )
+        return sub_user
+
+    return _factory

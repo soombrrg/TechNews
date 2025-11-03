@@ -254,13 +254,13 @@ class TestCancelSubscription:
 class TestPinnedPost:
     def test_permission_not_authenticated(self, api, pinned_post):
         response = api.get(
-            reverse("v1:subscribe:pinned-post"),
+            reverse("v1:subscribe:my-pinned-post"),
             expected_status_code=401,
         )
 
     def test_fields(self, api, auth_user, pinned_post):
         # PinnedPostView uses same serializer for all methods
-        response = api.get(reverse("v1:subscribe:pinned-post"))
+        response = api.get(reverse("v1:subscribe:my-pinned-post"))
 
         serializer = PinnedPostSerializer()
         expected_fields = serializer.fields
@@ -270,7 +270,7 @@ class TestPinnedPost:
 
     def test_get_no_pinned_post(self, api, auth_user):
         response = api.get(
-            reverse("v1:subscribe:pinned-post"),
+            reverse("v1:subscribe:my-pinned-post"),
             expected_status_code=404,
         )
         assert response["detail"]
@@ -279,7 +279,7 @@ class TestPinnedPost:
         post_to_pin = post.id
         data = {"post": post_to_pin}
 
-        response = api.api_client.put(reverse("v1:subscribe:pinned-post"), data=data)
+        response = api.api_client.put(reverse("v1:subscribe:my-pinned-post"), data=data)
         response_data = response.json()
 
         assert response.status_code == 403
@@ -297,14 +297,14 @@ class TestPinnedPost:
             status=Subscription.PENDING,
         )
 
-        response = api.api_client.put(reverse("v1:subscribe:pinned-post"), data=data)
+        response = api.api_client.put(reverse("v1:subscribe:my-pinned-post"), data=data)
         response_data = response.json()
 
         assert response.status_code == 403
         assert response_data["error"]
 
     def test_delete_not_pinned_post(self, api, auth_user, mixer):
-        response = api.api_client.delete(reverse("v1:subscribe:pinned-post"))
+        response = api.api_client.delete(reverse("v1:subscribe:my-pinned-post"))
         response_data = response.json()
 
         assert response.status_code == 404
@@ -314,115 +314,11 @@ class TestPinnedPost:
         db_p_post_exists = PinnedPost.objects.filter(pk=pinned_post.pk).exists()
         assert db_p_post_exists
 
-        response = api.api_client.delete(reverse("v1:subscribe:pinned-post"))
+        response = api.api_client.delete(reverse("v1:subscribe:my-pinned-post"))
         db_p_post_exists = PinnedPost.objects.filter(pk=pinned_post.pk).exists()
 
         assert response.status_code == 204
         assert not db_p_post_exists
-
-
-class TestPinPost:
-    def test_permission_not_authenticated(self, api):
-        data = {}
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=401,
-        )
-
-    def test_only_post(self, api, auth_user, subscription, post):
-        response = api.get(reverse("v1:subscribe:pin-post"), expected_status_code=405)
-
-        data = {"post_id": post.id}
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=201,
-        )
-
-    def test_no_subscription(self, api, auth_user, post):
-        data = {"post_id": post.id}
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=400,  # On validation error
-        )
-        # User should have active subscription
-        assert response["non_field_errors"]
-
-    def test_no_post(self, api, auth_user, subscription):
-        data = {"post_id": 1}
-        # In serializer post existence is checked
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=400,
-        )
-        # View returns serializer errors
-        assert response["post_id"]
-
-    def test_not_authored(self, api, auth_user, subscription, category, mixer):
-        post_user = mixer.blend(User)
-        post_1 = mixer.blend(Post, author=post_user, category=category)
-
-        data = {"post_id": post_1.id}
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=400,
-        )
-        # User should be post author
-        assert response["post_id"]
-
-    def test_success(self, api, auth_user, subscription, post):
-        p_post_exists = PinnedPost.objects.filter(user=auth_user, post=post).exists()
-        assert not p_post_exists
-
-        data = {"post_id": post.id}
-        response = api.post(
-            reverse("v1:subscribe:pin-post"),
-            data=data,
-            expected_status_code=201,
-        )
-        p_post = PinnedPost.objects.filter(user=auth_user, post=post)
-
-        serializer = PinnedPostSerializer()
-        expected_fields = serializer.fields
-
-        assert p_post
-        for field in expected_fields:
-            assert field in response
-
-
-class TestUnpinPost:
-    def test_permission_not_authenticated(self, api):
-        response = api.post(
-            reverse("v1:subscribe:unpin-post"),
-            expected_status_code=401,
-        )
-
-    def test_only_post(self, api, auth_user, pinned_post):
-        response = api.get(reverse("v1:subscribe:unpin-post"), expected_status_code=405)
-
-        response = api.post(reverse("v1:subscribe:unpin-post"))
-
-    def test_no_post(self, api, auth_user):
-        response = api.post(
-            reverse("v1:subscribe:unpin-post"),
-            expected_status_code=404,
-        )
-
-        assert response["error"]
-
-    def test_success(self, api, auth_user, pinned_post):
-        p_post = PinnedPost.objects.get(user=auth_user)
-        assert p_post.post == pinned_post.post
-
-        response = api.post(reverse("v1:subscribe:unpin-post"))
-        p_post_exists = PinnedPost.objects.filter(user=auth_user).exists()
-
-        assert not p_post_exists
-        assert response["msg"]
 
 
 class TestPinnedPostList:
@@ -433,20 +329,14 @@ class TestPinnedPostList:
             reverse("v1:subscribe:pinned-posts-list"), expected_status_code=405
         )
 
-    def test_success(
-        self, api, user, subscription, category, subscription_plan, post, mixer
-    ):
-        user_2 = mixer.blend(User)
-        subscription_2 = mixer.blend(
-            Subscription,
-            user=user_2,
-            plan=subscription_plan,
-            status=Subscription.ACTIVE,
-            end_date=timezone.now() + timedelta(days=30),
-        )
+    def test_success(self, api, subscribed_user_factory, category, mixer):
+        user_1 = subscribed_user_factory()
+        user_2 = subscribed_user_factory()
+
+        post_1 = mixer.blend(Post, category=category, author=user_1)
         post_2 = mixer.blend(Post, category=category, author=user_2)
 
-        pinned_post_1 = mixer.blend(PinnedPost, user=user, post=post)
+        pinned_post_1 = mixer.blend(PinnedPost, user=user_1, post=post_1)
         pinned_post_2 = mixer.blend(PinnedPost, user=user_2, post=post_2)
 
         response = api.get(reverse("v1:subscribe:pinned-posts-list"))
