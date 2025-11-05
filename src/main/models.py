@@ -75,7 +75,7 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
         if args or kwargs:
             queryset = self.filter(*args, **kwargs)
 
-        from django.db.models import Case, When, Value, IntegerField
+        from django.db.models import Case, IntegerField, Value, When
 
         return (
             queryset.select_related(

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Type
 
-from django.db.models import Q, QuerySet
 from django.db import transaction
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -9,6 +9,7 @@ from rest_framework import filters, generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
+
 from app.permissions import IsAuthorOrReadOnly
 from main.api.serializers import (
     CategorySerializer,
@@ -17,9 +18,9 @@ from main.api.serializers import (
     PostCreateUpdateSerializer,
     PostDetailSerializer,
     PostListSerializer,
+    PostPinningSerializer,
     PostsByCategorySerializer,
     TogglePostPinStatusSerializer,
-    PostPinningSerializer,
 )
 from main.models import Category, Post
 

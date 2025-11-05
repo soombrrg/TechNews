@@ -173,12 +173,12 @@ class SubscriptionHistory(models.Model):
     FAILED = "failed"
 
     ACTION_CHOICES = [
-        (CREATED, "created"),
-        (ACTIVATED, "activated"),
-        (RENEWED, "renewed"),
-        (CANCELLED, "cancelled"),
-        (EXPIRED, "expired"),
-        (FAILED, "failed"),
+        (CREATED, "Created"),
+        (ACTIVATED, "Activated"),
+        (RENEWED, "Renewed"),
+        (CANCELLED, "Cancelled"),
+        (EXPIRED, "Expired"),
+        (FAILED, "Failed"),
     ]
 
     subscription = models.ForeignKey(
