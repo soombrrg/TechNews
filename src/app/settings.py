@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from environ import environ  # type: ignore[import-untyped]
+import environ  # type: ignore[import-untyped]
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "main",
     "comments",
     "subscribe",
+    "payments",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -239,6 +240,10 @@ if LOGGING_MODE == "prod":
         },
     }
 
+    import os  # noqa
+
+    os.makedirs(BASE_DIR / "logs", exist_ok=True)
+
 
 # DRF
 REST_FRAMEWORK = {
@@ -279,6 +284,7 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API built with DRF",
     "SCHEMA_PATH_PREFIX": r"/api/v[0-9]",
     # "SCHEMA_PATH_PREFIX_TRIM": True,
+    "SERVE_INCLUDE_SCHEMA": True,
     "COMPONENT_NO_READ_ONLY_REQUIRED": True,
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
@@ -297,11 +303,13 @@ if DEBUG:
         "debug_toolbar.middleware.DebugToolbarMiddleware",
         "debug_toolbar_force.middleware.ForceDebugToolbarMiddleware",
     )
-    # Uncomment if app in docker
-    # DEBUG_TOOLBAR_CONFIG = {
-    #     "SHOW_TOOLBAR_CALLBACK": lambda request: True,
-    #     "RENDER_PANELS": True,
-    # }
+    # If django app in docker
+    DJANGO_IN_DOCKER = env("DJANGO_IN_DOCKER", cast=bool, default=False)
+    if DJANGO_IN_DOCKER:
+        DEBUG_TOOLBAR_CONFIG = {
+            "SHOW_TOOLBAR_CALLBACK": lambda request: True,
+            "RENDER_PANELS": True,
+        }
 
     # CORS for Frontend
     CORS_ALLOW_ALL_ORIGINS = True
@@ -310,6 +318,9 @@ else:
         "http://localhost:5173",  # frontend port
         "http://127.0.0.1:5173",
     ]
+
+# Frontend URL for redirect
+FRONTEND_URL = env("FRONTEND_URL", cast=str, default="http://localhost:5173")
 
 # JWT Configuration
 from datetime import timedelta  # noqa
@@ -329,5 +340,45 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
 }
 
-# Celery, Celery beat
-# ...
+# Celery
+USE_CELERY = env("USE_CELERY", cast=bool, default=False)
+if USE_CELERY:
+    CELERY_BROKER_URL = env(
+        "CELERY_BROKER_URL", cast=str, default="redis://localhost:6379/0"
+    )
+    CELERY_RESULT_BACKEND = env(
+        "CELERY_RESULT_BACKEND", cast=str, default="redis://localhost:6379/0"
+    )
+    CELERY_TIMEZONE = TIME_ZONE
+    CELERY_TASK_SERIALIZER = "json"
+    CELERY_RESULT_SERIALIZER = "json"
+    CELERY_ACCEPT_CONTENT = ["json"]
+
+    # Celery Beat for periodical tasks
+    CELERY_BEAT_SCHEDULE = {
+        "check-expired-subscriptions": {
+            "task": "src.subscribe.tasks.check_expired_subscriptions",
+            "schedule": 3600.0,  # Every hour
+        },
+        "send-subscription-expiry-reminders": {
+            "task": "src.subscribe.tasks.send_subscription_expiry_reminder",
+            "schedule": 86400.0,  # Every day
+        },
+        "cleanup-old-payments": {
+            "task": "src.payment.tasks.cleanup_old_payments",
+            "schedule": 604800.0,  # Every week
+        },
+        "cleanup-old-webhook-events": {
+            "task": "src.payment.tasks.cleanup_old_webhook_events",
+            "schedule": 86400.0,  # Every day
+        },
+        "retry-failed-webhook-events": {
+            "task": "src.payment.tasks.retry_failed_webhook_events",
+            "schedule": 3600.0,  # Every day
+        },
+    }
+
+
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", cast=str, default="")
+STRIPE_PUBLISHABLE_KEY = env("STRIPE_PUBLISHABLE_KEY", cast=str, default="")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", cast=str, default="")
