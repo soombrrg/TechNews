@@ -1,9 +1,47 @@
 from typing import Any
 
 from django.db.models import Sum
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from payments.models import Payment, PaymentAttempt, Refund, WebhookEvent
+
+
+class CreatedByInfoSerializer(serializers.Serializer):
+    """Serializer for correct display of created_by_info field in OpenAPI."""
+
+    id = serializers.UUIDField(read_only=True)
+    username = serializers.CharField(read_only=True)
+
+
+class UserInfoSerializer(CreatedByInfoSerializer):
+    """Serializer for correct display of user_info field in OpenAPI."""
+
+    email = serializers.EmailField(read_only=True)
+
+
+class SubscriptionInfoSerializer(serializers.Serializer):
+    """Serializer for correct display of subscription_info field in OpenAPI."""
+
+    from subscribe.models import Subscription
+
+    id = serializers.UUIDField(read_only=True)
+    plan_name = serializers.CharField(read_only=True)
+    start_date = serializers.DateTimeField(read_only=True)
+    end_date = serializers.DateTimeField(read_only=True)
+    status = serializers.ChoiceField(
+        choices=Subscription.STATUS_CHOICES, read_only=True
+    )
+
+
+class PaymentInfoSerializer(serializers.Serializer):
+    """Serializer for correct display of subscription_info field in OpenAPI."""
+
+    id = serializers.UUIDField(read_only=True)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    currency = serializers.CharField(max_length=3, read_only=True)
+    status = serializers.ChoiceField(choices=Payment.STATUS_CHOICES, read_only=True)
+    user = serializers.CharField(read_only=True)
 
 
 class PaymentSerializer(serializers.ModelSerializer[Payment]):
@@ -45,6 +83,7 @@ class PaymentSerializer(serializers.ModelSerializer[Payment]):
             "processed_at",
         ]
 
+    @extend_schema_field(UserInfoSerializer)
     def get_user_info(self, obj: Payment) -> dict[str, Any]:
         """Return information about user"""
         return {
@@ -53,6 +92,7 @@ class PaymentSerializer(serializers.ModelSerializer[Payment]):
             "email": obj.user.email,
         }
 
+    @extend_schema_field(SubscriptionInfoSerializer)
     def get_subscription_info(self, obj: Payment) -> dict[str, Any] | None:
         """Return information about subscription"""
         if obj.subscription:
@@ -75,17 +115,6 @@ class PaymentCreateSerializer(serializers.Serializer):
     )
     success_url = serializers.URLField(required=False)
     cancel_url = serializers.URLField(required=False)
-
-    def validate_subscription_plan_id(self, value: int) -> int:
-        """Validate subscription plan id"""
-        from subscribe.models import SubscriptionPlan
-
-        try:
-            plan = SubscriptionPlan.objects.get(id=value, is_active=True)
-        except SubscriptionPlan.DoesNotExist:
-            raise serializers.ValidationError("Invalid subscription plan id. ")
-
-        return value
 
     def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         """General validation"""
@@ -152,6 +181,7 @@ class RefundSerializer(serializers.ModelSerializer[Refund]):
         ]
         read_only_fields = ["id", "status", "created", "processed_at"]
 
+    @extend_schema_field(PaymentInfoSerializer)
     def get_payment_info(self, obj: Refund) -> dict[str, Any]:
         """Return information about payment"""
         return {
@@ -162,6 +192,7 @@ class RefundSerializer(serializers.ModelSerializer[Refund]):
             "user": obj.payment.user.username,
         }
 
+    @extend_schema_field(CreatedByInfoSerializer)
     def get_created_by_info(self, obj: Refund) -> dict[str, Any] | None:
         """Return information about user that created the refund"""
         if obj.created_by:
@@ -248,6 +279,35 @@ class PaymentStatusSerializer(serializers.Serializer):
     """Serializer for Payment Status"""
 
     payment_id = serializers.IntegerField()
-    status = serializers.CharField()
+    status = serializers.ChoiceField(choices=Payment.STATUS_CHOICES)
     message = serializers.CharField()
     subscription_activated = serializers.BooleanField(default=False)
+
+
+class PaymentAnalyticsSerializer(serializers.Serializer):
+    """Serializer for correct display of payment_analytics view response data in OpenAPI."""
+
+    total_payments = serializers.IntegerField(read_only=True)
+    successful_payments = serializers.IntegerField(read_only=True)
+    success_rate = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+    total_revenue = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+    monthly_revenue = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+    monthly_payments = serializers.IntegerField(read_only=True)
+    avg_payment = serializers.DecimalField(
+        max_digits=10, decimal_places=2, read_only=True
+    )
+    active_subscriptions = serializers.IntegerField(read_only=True)
+    period = serializers.DictField(read_only=True, child=serializers.DateTimeField())
+
+
+class UserPaymentHistorySerializer(serializers.Serializer):
+    """Serializer for correct display of user_payment_history view response data in OpenAPI."""
+
+    count = serializers.IntegerField(read_only=True)
+    results = PaymentSerializer(many=True, read_only=True)

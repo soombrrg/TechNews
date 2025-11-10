@@ -1,9 +1,11 @@
 import logging
+from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import stripe
 from django.conf import settings
+from django.db.models import Avg, Sum
 from django.utils import timezone
 
 from payments.models import Payment, WebhookEvent
@@ -46,21 +48,32 @@ class StripeService:
         """Create session Stripe Checkout"""
         try:
             # Retrieving or creating user
-            if not payment.stripe_customer_id:
+            if payment.stripe_customer_id is None:
                 customer_id = StripeService.create_customer(payment.user)
-                if customer_id:
+                if customer_id is None:
+                    payment.mark_as_failed(
+                        f"Error creating Stripe customer for: {payment.user}"
+                    )
+                    return None
+                else:
                     payment.stripe_customer_id = customer_id
                     payment.save()
 
+            if payment.subscription is None:
+                payment.mark_as_failed(
+                    "Subscription not found when creating Stripe checkout session."
+                )
+                return None
+
             session = stripe.checkout.Session.create(
-                customer=payment.stripe_customer_id,  # type: ignore
+                customer=payment.stripe_customer_id,
                 payment_method_types=["card"],
                 line_items=[
                     {
                         "price_data": {
                             "currency": payment.currency.lower(),
                             "product_data": {
-                                "name": f"Subscription - {payment.subscription.plan.name}",  # type: ignore
+                                "name": f"Subscription - {payment.subscription.plan.name}",
                                 "description": payment.description,
                             },
                             "unit_amount": int(payment.amount * 100),  # In Cents
@@ -274,6 +287,62 @@ class PaymentService:
             logger.error("Error cancelling subscription %s: %s", subscription.id, e)
             return False
 
+    @staticmethod
+    def get_payment_analytics() -> dict[str, Any]:
+        """Get payment analytics"""
+        # General statistic
+        total_payments = Payment.objects.count()
+        successful_payments = Payment.objects.filter(status=Payment.SUCCEEDED).count()
+        total_revenue = (
+            Payment.objects.filter(status=Payment.SUCCEEDED).aggregate(
+                total=Sum("amount")
+            )["total"]
+            or 0
+        )
+
+        # Statistic of last month
+        current_datetime = timezone.now()
+        last_month = current_datetime - timedelta(days=30)
+        monthly_payments = Payment.objects.filter(
+            created__gte=last_month,
+            status=Payment.SUCCEEDED,
+        )
+        monthly_revenue = monthly_payments.aggregate(total=Sum("amount"))["total"] or 0
+        monthly_count = monthly_payments.count()
+
+        # Average payment
+        avg_payment = (
+            Payment.objects.filter(status=Payment.SUCCEEDED).aggregate(
+                avg=Avg("amount")
+            )["avg"]
+            or 0
+        )
+
+        # Statistic by subscription
+        active_subscriptions = Payment.objects.filter(
+            status=Payment.SUCCEEDED,
+            subscription__status=Subscription.ACTIVE,
+        ).count()
+
+        return {
+            "total_payments": total_payments,
+            "successful_payments": successful_payments,
+            "success_rate": (
+                round(successful_payments / total_payments * 100, 2)
+                if total_payments
+                else 0
+            ),
+            "total_revenue": round(float(total_revenue), 2),
+            "monthly_revenue": round(float(monthly_revenue), 2),
+            "monthly_payments": monthly_count,
+            "avg_payment": round(float(avg_payment), 2),
+            "active_subscriptions": active_subscriptions,
+            "period": {
+                "from": last_month.isoformat(),
+                "to": current_datetime.isoformat(),
+            },
+        }
+
 
 class WebhookService:
     """Service for webhook events management"""
@@ -289,8 +358,11 @@ class WebhookService:
             if WebhookEvent.objects.filter(event_id=event_id).exists():
                 return True
 
+            if event_id is None or event_type is None:
+                raise Exception("event_id or event_type not provided.")
+
             # Creating event record
-            webhook_event = WebhookEvent.objects.create(  # type: ignore
+            webhook_event = WebhookEvent.objects.create(
                 provider=WebhookEvent.STRIPE,
                 event_id=event_id,
                 event_type=event_type,

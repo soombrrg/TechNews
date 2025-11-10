@@ -1,34 +1,35 @@
-from datetime import timedelta
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import stripe
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Avg, QuerySet, Sum
+from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from payments.api.serializers import (
+    PaymentAnalyticsSerializer,
     PaymentCreateSerializer,
     PaymentSerializer,
     PaymentStatusSerializer,
     RefundCreateSerializer,
     RefundSerializer,
     StripeCheckoutSessionSerializer,
+    UserPaymentHistorySerializer,
 )
 from payments.models import Payment, Refund
 from payments.services import PaymentService, StripeService, WebhookService
-from subscribe.models import Subscription, SubscriptionPlan
+from subscribe.models import SubscriptionPlan
 
 if TYPE_CHECKING:
-    from uuid import UUID
 
     from django.contrib.auth.models import AnonymousUser
 
@@ -67,9 +68,17 @@ class PaymentDetailView(PaymentBase, generics.RetrieveAPIView):
         return super().get_base_queryset()
 
 
+@extend_schema(
+    request=PaymentCreateSerializer,
+    responses={
+        200: StripeCheckoutSessionSerializer,
+        404: {"properties": {"error": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
-def create_checkout_session(request: Request) -> Response:
+def create_checkout_session_view(request: Request) -> Response:
     """Create Stripe Checkout session of subscription payment."""
     if TYPE_CHECKING:
         # Explicit type check for MyPy
@@ -83,17 +92,17 @@ def create_checkout_session(request: Request) -> Response:
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    plan_id = serializer.validated_data["subscription_plan_id"]
+    plan = get_object_or_404(SubscriptionPlan, id=plan_id, is_active=True)
+
     try:
         with transaction.atomic():
-            plan_id = serializer.validated_data["subscription_plan_id"]
-            plan = get_object_or_404(SubscriptionPlan, id=plan_id, is_active=True)
-
             # Creating payment and subscription
             payment, subscription = PaymentService.create_subscription_payment(
                 request.user, plan
             )
 
-            # Retrieving URLs from request
+            # Retrieving URLs
             success_url = serializer.validated_data.get(
                 "success_url",
                 f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
@@ -121,6 +130,18 @@ def create_checkout_session(request: Request) -> Response:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+@extend_schema(
+    request={
+        "application/json": {
+            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
+        }
+    },
+    responses={
+        404: {"properties": {"error": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+        200: PaymentStatusSerializer,
+    },
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def payment_status(request: Request, payment_id: "UUID") -> Response:
@@ -166,6 +187,18 @@ def payment_status(request: Request, payment_id: "UUID") -> Response:
         )
 
 
+@extend_schema(
+    request={
+        "application/json": {
+            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
+        }
+    },
+    responses={
+        404: {"properties": {"error": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+        200: {"properties": {"message": {"type": "string"}}},
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def cancel_payment(request: Request, payment_id: "UUID") -> Response:
@@ -231,6 +264,14 @@ class RefundDetailView(RefundBaseView, generics.RetrieveAPIView):
         return super().get_base_queryset()
 
 
+@extend_schema(
+    request=RefundCreateSerializer,
+    responses={
+        404: {"properties": {"error": {"type": "string"}}},
+        400: {"properties": {"error": {"type": "string"}}},
+        200: PaymentStatusSerializer,
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAdminUser])
 def create_refund(request: Request, payment_id: "UUID") -> Response:
@@ -289,6 +330,7 @@ def create_refund(request: Request, payment_id: "UUID") -> Response:
         )
 
 
+@extend_schema(exclude=True)
 @csrf_exempt
 @require_POST
 def stripe_webhook(request: Request) -> HttpResponse:
@@ -318,64 +360,20 @@ def stripe_webhook(request: Request) -> HttpResponse:
     return HttpResponse(status=200)
 
 
+@extend_schema(responses=PaymentAnalyticsSerializer)
 @api_view(["GET"])
 @permission_classes([permissions.IsAdminUser])
 def payment_analytics(request: Request) -> Response:
     """Analytic of payment for administrators only."""
-    # General statistic
-    total_payments = Payment.objects.count()
-    successful_payments = Payment.objects.filter(status=Payment.SUCCEEDED).count()
-    total_revenue = (
-        Payment.objects.filter(status=Payment.SUCCEEDED).aggregate(total=Sum("amount"))[
-            "total"
-        ]
-        or 0
-    )
-
-    # Statistic of last month
-    current_datetime = timezone.now()
-    last_month = current_datetime - timedelta(days=30)
-    monthly_payments = Payment.objects.filter(
-        created__gte=last_month,
-        status=Payment.SUCCEEDED,
-    )
-    monthly_revenue = monthly_payments.aggregate(total=Sum("amount"))["total"] or 0
-    monthly_count = monthly_payments.count()
-
-    # Average payment
-    avg_payment = (
-        Payment.objects.filter(status=Payment.SUCCEEDED).aggregate(avg=Avg("amount"))[
-            "avg"
-        ]
-        or 0
-    )
-
-    # Statistic by subscription
-    active_subscriptions = Payment.objects.filter(
-        status=Payment.SUCCEEDED,
-        subscription__status=Subscription.ACTIVE,
-    ).count()
-
-    return Response(
-        {
-            "total_payments": total_payments,
-            "successful_payments": successful_payments,
-            "success_rate": (
-                (successful_payments / total_payments * 100) if total_payments else 0
-            ),
-            "total_revenue": float(total_revenue),
-            "monthly_revenue": float(monthly_revenue),
-            "monthly_payments": monthly_count,
-            "avg_payment": float(avg_payment),
-            "active_subscriptions": active_subscriptions,
-            "period": {
-                "from": last_month.isoformat(),
-                "to": current_datetime.isoformat(),
-            },
-        }
-    )
+    analytics = PaymentService.get_payment_analytics()
+    return Response(analytics)
 
 
+@extend_schema(
+    responses={
+        200: UserPaymentHistorySerializer,
+    },
+)
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def user_payment_history(request: Request) -> Response:
@@ -400,6 +398,17 @@ def user_payment_history(request: Request) -> Response:
     )
 
 
+@extend_schema(
+    request={
+        "application/json": {
+            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
+        }
+    },
+    responses={
+        200: StripeCheckoutSessionSerializer,
+        404: {"properties": {"error": {"type": "string"}}},
+    },
+)
 @api_view(["POST"])
 @permission_classes([permissions.IsAuthenticated])
 def retry_payment(request: Request, payment_id: "UUID") -> Response:
@@ -410,13 +419,15 @@ def retry_payment(request: Request, payment_id: "UUID") -> Response:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
 
     try:
-        payment = Payment.objects.get(
+        payment = Payment.objects.select_related(
+            "subscription", "subscription__plan"
+        ).get(
             id=payment_id,
             user=request.user,
             status=Payment.FAILED,
         )
 
-        # Creating new session for repeated payment
+        # Retrieving URLs
         success_url = request.data.get(
             "success_url",
             f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",

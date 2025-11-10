@@ -293,6 +293,11 @@ SPECTACULAR_SETTINGS = {
     "SWAGGER_UI_DIST": "SIDECAR",
     "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
     "REDOC_DIST": "SIDECAR",
+    "ENUM_SUFFIX": "Enum",
+    "ENUM_NAME_OVERRIDES": {
+        "SubscriptionStatusEnum": "subscribe.models.Subscription.STATUS_CHOICES",
+        "PaymentStatusEnum": "payments.models.Payment.STATUS_CHOICES",
+    },
 }
 
 if DEBUG:
