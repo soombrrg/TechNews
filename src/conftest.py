@@ -10,6 +10,7 @@ from accounts.models import User
 from app.test.api_clients import AppClient
 from comments.models import Comment
 from main.models import Category, Post
+from payments.models import Payment, Refund
 from subscribe.models import (
     PinnedPost,
     Subscription,
@@ -37,6 +38,14 @@ def user(mixer) -> User:
 
 @pytest.fixture
 def auth_user(api, user: User) -> User:
+    api.api_client.force_authenticate(user)
+    return user
+
+
+@pytest.fixture
+def auth_admin_user(api, user, mixer) -> User:
+    user.is_staff = True
+    user.save()
     api.api_client.force_authenticate(user)
     return user
 
@@ -84,6 +93,16 @@ def pinned_post(
 @pytest.fixture
 def history(mixer, subscription: Subscription) -> SubscriptionHistory:
     return mixer.blend(SubscriptionHistory, subscription=subscription)
+
+
+@pytest.fixture
+def payment_w_sub(mixer, user: User, subscription: Subscription) -> Payment:
+    return mixer.blend(Payment, user=user, subscription=subscription)
+
+
+@pytest.fixture
+def refund(mixer, payment_w_sub) -> Refund:
+    return mixer.blend(Refund, payment=payment_w_sub)
 
 
 @pytest.fixture
