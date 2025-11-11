@@ -39,23 +39,34 @@ class CommentListCreateView(generics.ListCreateAPIView):
     ordering = ["-created"]
 
     def get_queryset(self) -> QuerySet[Comment]:
-        return Comment.objects.filter(is_active=True).select_related(
-            "post", "author", "parent"
+        if self.request.method == "POST":
+            return Comment.objects.filter(is_active=True).select_related("parent")
+        return (
+            Comment.objects.filter(is_active=True)
+            .select_related("author", "parent")
+            .with_replies_count()
         )
 
     def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method == "POST":
             return CommentCreateSerializer
-        else:
-            return CommentSerializer
+        return CommentSerializer
 
 
 class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Detail view for retrieve, update, and delete comment"""
 
     permission_classes = [IsAuthorOrReadOnly]
-    serializer_class = CommentDetailSerializer
-    queryset = Comment.objects.filter(is_active=True).select_related("author", "post")
+
+    def get_queryset(self) -> QuerySet[Comment]:
+        if self.request.method in ["PUT", "PATCH"]:
+            return Comment.objects.filter(is_active=True).select_related("author")
+        return (
+            Comment.objects.filter(is_active=True)
+            .select_related("author", "parent")
+            .with_replies()
+            .with_replies_count()
+        )
 
     def get_serializer_class(self) -> Type[Serializer]:
         if self.request.method in ["PUT", "PATCH"]:
@@ -63,7 +74,7 @@ class CommentDetailView(generics.RetrieveUpdateDestroyAPIView):
         return CommentDetailSerializer
 
     def perform_destroy(self, instance: Comment) -> None:
-        # Soft deletion - mark as inactive
+        # Soft delete
         instance.is_active = False
         instance.save()
 
@@ -93,8 +104,10 @@ class UsersCommentsView(generics.ListAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Comment.objects.none()
 
-        return Comment.objects.filter(author=self.request.user).select_related(
-            "post", "parent"
+        return (
+            Comment.objects.filter(author=self.request.user)
+            .select_related("parent", "author")
+            .with_replies_count()
         )
 
 
@@ -113,7 +126,7 @@ def post_comments(request: Request, post_id: int) -> Response:
             parent=None,
         )
         .select_related("author")
-        .prefetch_related("replies__author")
+        .with_replies_count()
         .order_by("-created")
     )
 
@@ -127,7 +140,7 @@ def post_comments(request: Request, post_id: int) -> Response:
             "slug": post.slug,
         },
         "comments": comments_serializer.data,
-        "comments_count": post.comments_count,
+        "comments_count": len(comments_serializer.data),
     }
 
     return Response(data)
@@ -138,13 +151,15 @@ def post_comments(request: Request, post_id: int) -> Response:
 @permission_classes([permissions.AllowAny])
 def comment_replies(request: Request, comment_id: int) -> Response:
     """GET comment`s replies"""
-    parent_comment = get_object_or_404(Comment, id=comment_id)
-
-    replies = (
-        Comment.objects.filter(parent=parent_comment, is_active=True)
-        .select_related("author")
-        .order_by("-created")
+    parent_comment = get_object_or_404(
+        Comment.objects.select_related("author")
+        .with_replies()
+        .with_replies_count()
+        .order_by("-created"),
+        id=comment_id,
     )
+
+    replies = parent_comment.replies.all()
 
     parent_comment_serializer = CommentSerializer(
         parent_comment, context={"request": request}
@@ -156,7 +171,6 @@ def comment_replies(request: Request, comment_id: int) -> Response:
     data = {
         "parent_comment": parent_comment_serializer.data,
         "replies": replies_serializer.data,
-        "replies_count": len(replies),
     }
 
     return Response(data)

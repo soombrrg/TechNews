@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.db import models
-from django.db.models import QuerySet
+from django.db.models import Count, Q
 from django.db.models.functions import Now
 from django.urls import reverse
 
@@ -33,10 +33,10 @@ class Category(SluggedModel):
         return self.name
 
 
-class PinnedPostQuerySet(models.QuerySet["Post"]):
-    """QuerySet for Post Model"""
+class PostQuerySet(models.QuerySet["Post"]):
+    """QuerySet for Post model"""
 
-    def pinned(self) -> QuerySet["Post"]:
+    def pinned(self) -> "PostQuerySet":
         """Returns a queryset of pinned posts in pinned_at order"""
         from subscribe.models import Subscription  # noqa
 
@@ -55,13 +55,13 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
             .order_by("pin_info__pinned_at")
         )
 
-    def regular_posts(self) -> QuerySet["Post"]:
+    def regular_posts(self) -> "PostQuerySet":
         """Returns a queryset of regular (unpinned) posts"""
         return self.filter(
             pin_info__isnull=True, publication_status=PublishedModel.PUBLISHED
         )
 
-    def with_subscription_info(self) -> QuerySet["Post"]:
+    def with_subscription_info(self) -> "PostQuerySet":
         """Returns a queryset of posts with info about author subscription"""
         return self.select_related(
             "author",
@@ -69,7 +69,7 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
             "category",
         ).prefetch_related("pin_info")
 
-    def for_feed(self, *args: Any, **kwargs: Any) -> QuerySet["Post"]:
+    def for_feed(self, *args: Any, **kwargs: Any) -> "PostQuerySet":
         """Return a queryset of pinned and unpinned posts in "pinned_at" or "-created" order"""
         queryset = self.filter(publication_status=PublishedModel.PUBLISHED)
         if args or kwargs:
@@ -92,9 +92,18 @@ class PinnedPostQuerySet(models.QuerySet["Post"]):
                     When(pin_info__isnull=True, then=Value(2)),  # Regular posts
                     default=Value(2),
                     output_field=IntegerField(),
-                )
+                ),
+                comments_count=Count("comments", filter=Q(comments__is_active=True)),
             )
             .order_by("post_type_order", "pin_info__pinned_at", "-created")
+        )
+
+    def with_comments_count(self) -> "PostQuerySet":
+        return self.annotate(
+            comments_count=Count(
+                "comments",
+                filter=Q(comments__is_active=True),
+            )
         )
 
 
@@ -118,7 +127,7 @@ class Post(SluggedModel, PublishedModel, TimeStampedModel):
     image = models.ImageField(upload_to="posts/", null=True, blank=True)
     views_count = models.PositiveIntegerField(default=0)
 
-    objects = PinnedPostQuerySet.as_manager()  # type: ignore
+    objects = PostQuerySet.as_manager()  # type: ignore
 
     class Meta:
         db_table = "posts"
@@ -141,14 +150,6 @@ class Post(SluggedModel, PublishedModel, TimeStampedModel):
     @property
     def slug_source(self) -> str:
         return self.title
-
-    @property
-    def comments_count(self) -> int:
-        """Count of comments for post"""
-        try:
-            return self.comments.filter(is_active=True).count()
-        except AttributeError:
-            return 0
 
     @property
     def is_pinned(self) -> bool:
@@ -180,20 +181,6 @@ class Post(SluggedModel, PublishedModel, TimeStampedModel):
             return False
 
         return True
-
-    def get_pinned_info(self) -> dict[str, Any]:
-        """Return pinned post info"""
-        if self.is_pinned:
-            return {
-                "is_pinned": True,
-                "pinned_at": self.pin_info.pinned_at,
-                "pinned_by": {
-                    "id": self.pin_info.user.id,
-                    "username": self.pin_info.user.username,
-                    "has_active_subscription": self.pin_info.user.subscription.is_active,
-                },
-            }
-        return {"is_pinned": False}
 
     def increment_views(self) -> None:
         """Increment the views count"""

@@ -75,7 +75,9 @@ class PostListCreateView(generics.ListCreateAPIView):
         if getattr(self, "swagger_fake_view", False):
             return Post.objects.none()
 
-        queryset = Post.objects.select_related("author", "category")
+        queryset = Post.objects.select_related(
+            "author", "category"
+        ).with_comments_count()
 
         # Filter using access right
         if not self.request.user.is_authenticated:
@@ -122,7 +124,9 @@ class PostListCreateView(generics.ListCreateAPIView):
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Api endpoint for concrete post"""
 
-    queryset = Post.objects.select_related("author", "category")
+    queryset = Post.objects.select_related(
+        "author", "category", "pin_info"
+    ).with_comments_count()
     serializer_class = PostDetailSerializer
     permission_classes = [IsAuthorOrReadOnly]
     lookup_field = "slug"
@@ -170,8 +174,10 @@ class UsersPostsView(generics.ListAPIView):
             if isinstance(self.request.user, AnonymousUser):
                 return Post.objects.none()
 
-        return Post.objects.filter(author=self.request.user).select_related(
-            "category", "author"
+        return (
+            Post.objects.filter(author=self.request.user)
+            .select_related("category", "author")
+            .with_comments_count()
         )
 
 
@@ -183,6 +189,7 @@ def popular_posts(request: Request) -> Response:
     posts = (
         Post.objects.with_subscription_info()
         .filter(publication_status=Post.PUBLISHED)
+        .with_comments_count()
         .order_by("-views_count")[:10]
     )
 
@@ -203,6 +210,7 @@ def recent_posts(request: Request) -> Response:
     posts = (
         Post.objects.with_subscription_info()
         .filter(publication_status=Post.PUBLISHED)
+        .with_comments_count()
         .order_by("-created")[:10]
     )
 
@@ -251,7 +259,7 @@ def posts_by_category(request: Request, category_slug: str) -> Response:
 @permission_classes([permissions.AllowAny])
 def pinned_posts_only(request: Request) -> Response:
     """Return pinned posts"""
-    pinned_posts = Post.objects.pinned()
+    pinned_posts = Post.objects.pinned().with_comments_count()
     serializer = PostListSerializer(
         pinned_posts, many=True, context={"request": request}
     )
@@ -277,7 +285,7 @@ def featured_posts(request: Request) -> Response:
     from django.utils import timezone  # noqa
 
     # Retrieving last 3 pinned posts
-    pinned_posts = Post.objects.pinned()[:3]
+    pinned_posts = Post.objects.pinned().with_comments_count()[:3]
 
     # Retrieving popular posts (excluding pinned)
     week_ago = timezone.now() - timedelta(days=7)
@@ -290,6 +298,7 @@ def featured_posts(request: Request) -> Response:
         .exclude(
             id__in=[post.id for post in pinned_posts],
         )
+        .with_comments_count()
         .order_by("-views_count")[:6]
     )
 

@@ -5,7 +5,11 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from app.serializer import AuthorInfoSerializer, CategoryInfoSerializer
+from app.serializer import (
+    AuthorInfoSerializer,
+    CategoryInfoSerializer,
+    PinInfoSerializer,
+)
 from main.models import Category, Post
 
 
@@ -40,9 +44,9 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
 
     author = serializers.StringRelatedField()  # type: ignore[var-annotated]
     category = serializers.StringRelatedField()  # type: ignore[var-annotated]
-    comments_count = serializers.ReadOnlyField()
+    comments_count = serializers.IntegerField(read_only=True)
     is_pinned = serializers.ReadOnlyField()
-    pinned_info = serializers.SerializerMethodField()
+    pinned_info = PinInfoSerializer(read_only=True)
 
     class Meta:
         model = Post
@@ -63,10 +67,6 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
             "pinned_info",
         ]
         read_only_fields = ["slug", "author", "views_count"]
-
-    def get_pinned_info(self, obj: Post) -> dict[str, Any]:
-        """Returns info about post pinning"""
-        return obj.get_pinned_info()
 
     def create(self, validated_data: dict[str, Any]) -> Post:
         validated_data["author"] = self.context["request"].user
@@ -84,11 +84,11 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
 class PostDetailSerializer(serializers.ModelSerializer[Post]):
     """Serializer for Post details"""
 
-    author_info = serializers.SerializerMethodField()
-    category_info = serializers.SerializerMethodField()
-    comments_count = serializers.ReadOnlyField()
+    author_info = AuthorInfoSerializer(source="author", read_only=True)
+    category_info = CategoryInfoSerializer(source="category", read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
     is_pinned = serializers.ReadOnlyField()
-    pinned_info = serializers.SerializerMethodField()
+    pinned_info = PinInfoSerializer(read_only=True)
     can_pin = serializers.SerializerMethodField()
 
     class Meta:
@@ -106,18 +106,15 @@ class PostDetailSerializer(serializers.ModelSerializer[Post]):
             "publication_status",
             "comments_count",
             "views_count",
-            "created",
-            "modified",
             "is_pinned",
             "pinned_info",
             "can_pin",
+            "created",
+            "modified",
         ]
         read_only_fields = ["slug", "author", "views_count"]
 
-    def get_pinned_info(self, obj: Post) -> dict[str, Any]:
-        """Returns info about post pinning"""
-        return obj.get_pinned_info()
-
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_can_pin(self, obj: Post) -> bool:
         """Returns can post be pinned by user or not"""
         request = self.context.get("request")
@@ -135,27 +132,6 @@ class PostDetailSerializer(serializers.ModelSerializer[Post]):
         if len(data["content"]) > 200:
             data["content"] = data["content"][:200] + "..."
         return data
-
-    @extend_schema_field(AuthorInfoSerializer)
-    def get_author_info(self, obj: Post) -> dict[str, Any]:
-        author = obj.author
-        return {
-            "id": author.id,
-            "username": author.username,
-            "full_name": author.full_name,
-            "avatar": author.avatar.url if author.avatar else None,
-        }
-
-    @extend_schema_field(CategoryInfoSerializer)
-    def get_category_info(self, obj: Post) -> dict[str, Any] | None:
-        category = getattr(obj, "category", None)
-        if category is not None:
-            return {
-                "id": category.pk,
-                "name": category.name,
-                "slug": category.slug,
-            }
-        return None
 
 
 class PostCreateUpdateSerializer(serializers.ModelSerializer[Post]):

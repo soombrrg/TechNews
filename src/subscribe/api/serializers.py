@@ -126,7 +126,7 @@ class SubscriptionCreateSerializer(serializers.ModelSerializer[Subscription]):
 class PinnedPostSerializer(serializers.ModelSerializer[PinnedPost]):
     """Serializer for pinned posts"""
 
-    post_info = serializers.SerializerMethodField()
+    post_info = PostInfoSerializer(source="post", read_only=True)
 
     class Meta:
         model = PinnedPost
@@ -137,19 +137,6 @@ class PinnedPostSerializer(serializers.ModelSerializer[PinnedPost]):
             "pinned_at",
         ]
         read_only_fields = ["id", "pinned_at", "post_info"]
-
-    @extend_schema_field(PostInfoSerializer)
-    def get_post_info(self, obj: PinnedPost) -> dict[str, Any] | None:
-        """Returns info about post"""
-        return {
-            "id": obj.post.id,
-            "title": obj.post.title,
-            "slug": obj.post.slug,
-            "content": obj.post.content,
-            "image": obj.post.image.url if obj.post.image else None,
-            "views_count": obj.post.views_count,
-            "created": obj.post.created,
-        }
 
     def validate_post(self, value: "Post") -> "Post | None":
         """Post validation before pinning"""

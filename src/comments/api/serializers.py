@@ -12,8 +12,8 @@ from main.models import Post
 class CommentSerializer(serializers.ModelSerializer[Comment]):
     """Base serializer for Comments"""
 
-    author_info = serializers.SerializerMethodField()
-    replies_count = serializers.ReadOnlyField()
+    author_info = AuthorInfoSerializer(source="author", read_only=True)
+    replies_count = serializers.IntegerField(read_only=True)
     is_reply = serializers.ReadOnlyField()
 
     class Meta:
@@ -32,18 +32,11 @@ class CommentSerializer(serializers.ModelSerializer[Comment]):
         ]
         read_only_fields = ["author", "is_active"]
 
-    @extend_schema_field(AuthorInfoSerializer)
-    def get_author_info(self, obj: Comment) -> dict[str, Any]:
-        return {
-            "id": obj.author.id,
-            "username": obj.author.username,
-            "full_name": obj.author.full_name,
-            "avatar": obj.author.avatar.url if obj.author.avatar else None,
-        }
-
 
 class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
     """Serializer for Comments creation"""
+
+    post = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = Comment
@@ -55,12 +48,15 @@ class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
 
     def validate_post(self, value: Post) -> Post | None:
         # Check if post exists before creating comment
-        if not Post.objects.filter(
-            id=value.pk,
-            publication_status=Post.PUBLISHED,
-        ).exists():
+        try:
+            post = Post.objects.only("id", "title").get(
+                id=value,
+                publication_status=Post.PUBLISHED,
+            )
+            self.context["post"] = post
+            return value
+        except Post.DoesNotExist:
             raise serializers.ValidationError("Post not found.")
-        return value
 
     def validate_parent(self, value: Comment | None) -> Comment | None:
         # Comment can be without parent
@@ -80,6 +76,7 @@ class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
 
     def create(self, validated_data: dict[str, Any]) -> Comment:
         validated_data["author"] = self.context["request"].user
+        validated_data["post"] = self.context["post"]
         return super().create(validated_data)
 
 
@@ -103,8 +100,8 @@ class CommentDetailSerializer(CommentSerializer):
     def get_replies(self, obj: Comment) -> ReturnDict | list[Any]:
         # Displaying replies only for main comments
         if obj.parent is None:
-            replies = obj.replies.filter(is_active=True).order_by("created")
-            return CommentSerializer(replies, many=True, context=self.context).data
+            replies = obj.replies.all()
+            return CommentSerializer(replies, many=True).data
         return []
 
 

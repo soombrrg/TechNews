@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, permissions, status
@@ -257,6 +257,12 @@ def pinned_posts_list(request: Request) -> Response:
             user__subscription__end_date__gt=timezone.now(),
             post__publication_status=Post.PUBLISHED,
         )
+        .annotate(
+            comments_count=Count(
+                "post__comments",
+                filter=Q(post__comments__is_active=True),
+            )
+        )
         .order_by("pinned_at")
     )
 
@@ -283,7 +289,7 @@ def pinned_posts_list(request: Request) -> Response:
                     "avatar": post.author.avatar.url if post.author.avatar else None,
                 },
                 "views_count": post.views_count,
-                "comments_count": post.comments_count,
+                "comments_count": pinned_post.comments_count,
                 "created": post.created,
                 "pinned_at": pinned_post.pinned_at,
                 "is_pinned": True,
