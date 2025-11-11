@@ -168,19 +168,19 @@ class TestCommentDetail:
 class TestUsersComments:
     def test_permission_for_not_authenticated(self, api, comment):
         response = api.get(
-            reverse("v1:comments:users-comments"),
+            reverse("v1:comments:my-comments"),
             expected_status_code=401,
         )
 
         response = api.post(
-            reverse("v1:comments:users-comments"),
+            reverse("v1:comments:my-comments"),
             data={"content": "Test content"},
             expected_status_code=401,
         )
 
     def test_get_fields(self, api, auth_user, comment):
         # In comment fixture, author = user fixture
-        response = api.get(reverse("v1:comments:users-comments"))
+        response = api.get(reverse("v1:comments:my-comments"))
         response_results = response["results"]
 
         serializer = CommentSerializer()
@@ -212,7 +212,7 @@ class TestUsersComments:
             is_active=True,
         )
 
-        response = api.get(reverse("v1:comments:users-comments"))
+        response = api.get(reverse("v1:comments:my-comments"))
         response_results = response["results"]
 
         # Comments ordered by "-created"
@@ -271,8 +271,7 @@ class TestPostComments:
         # Response should contain only "active" comments
         assert len(response_comments) == 2
 
-        db_post = Post.objects.get(pk=post.pk)
-        assert response["comments_count"] == db_post.comments_count
+        assert response["comments_count"] == 2
 
 
 class TestCommentReplies:

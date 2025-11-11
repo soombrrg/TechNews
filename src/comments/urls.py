@@ -13,7 +13,7 @@ app_name = "comments"
 urlpatterns = [
     path("", CommentListCreateView.as_view(), name="comment-list"),
     path("<int:pk>/", CommentDetailView.as_view(), name="comment-detail"),
-    path("users-comments/", UsersCommentsView.as_view(), name="users-comments"),
+    path("my-comments/", UsersCommentsView.as_view(), name="my-comments"),
     path("post/<int:post_id>/", post_comments, name="post-comments"),
     path("<int:comment_id>/replies/", comment_replies, name="comment-replies"),
 ]
