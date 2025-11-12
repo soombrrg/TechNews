@@ -131,11 +131,7 @@ def create_checkout_session_view(request: Request) -> Response:
 
 
 @extend_schema(
-    request={
-        "application/json": {
-            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
-        }
-    },
+    request=None,
     responses={
         404: {"properties": {"error": {"type": "string"}}},
         400: {"properties": {"error": {"type": "string"}}},
@@ -188,11 +184,7 @@ def payment_status(request: Request, payment_id: "UUID") -> Response:
 
 
 @extend_schema(
-    request={
-        "application/json": {
-            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
-        }
-    },
+    request=None,
     responses={
         404: {"properties": {"error": {"type": "string"}}},
         400: {"properties": {"error": {"type": "string"}}},
@@ -399,11 +391,7 @@ def user_payment_history(request: Request) -> Response:
 
 
 @extend_schema(
-    request={
-        "application/json": {
-            "properties": {"payment_id": {"type": "string", "format": "uuid"}}
-        }
-    },
+    request=None,
     responses={
         200: StripeCheckoutSessionSerializer,
         404: {"properties": {"error": {"type": "string"}}},
