@@ -27,7 +27,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
         "created",
     )
     search_fields = ("name", "stripe_price_id")
-    read_only_fields = ("created", "modified")
+    readonly_fields = ("created", "modified")
 
     fieldsets = (
         (None, {"fields": ("name", "price", "duration_days", "stripe_price_id")}),
@@ -48,7 +48,7 @@ class SubscriptionPlanAdmin(admin.ModelAdmin):
 class SubscriptionHistoryInline(admin.TabularInline):
     model = SubscriptionHistory
     extra = 0
-    read_only_fields = ("action", "description", "metadata", "created")
+    readonly_fields = ("action", "description", "metadata", "created")
     can_delete = False
 
     def has_add_permission(self, request: HttpRequest, obj: None = None) -> bool:
@@ -68,7 +68,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "plan", "auto_renew", "created")
     search_fields = ("user__username", "user__email", "plan__name")
-    read_only_fields = ("created", "modified", "is_active", "days_remaining")
+    readonly_fields = ("created", "modified", "is_active", "days_remaining")
     raw_id_fields = ("user",)
     inlines = (SubscriptionHistoryInline,)
 
