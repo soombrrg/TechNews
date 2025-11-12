@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -69,20 +67,3 @@ class PinnedBySerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_has_active_subscription(self, obj: User) -> bool:
         return obj.subscription.is_active if hasattr(obj, "subscription") else False
-
-
-class PinInfoSerializer(serializers.ModelSerializer["Post"]):
-    """Serializer for correct display of pin info in OpenAPI."""
-
-    pinned_by = PinnedBySerializer(source="pin_info.user", read_only=True)
-    pinned_at = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Post
-        fields = ["pinned_by", "pinned_at"]
-
-    @extend_schema_field(OpenApiTypes.DATETIME)
-    def get_pinned_at(self, obj: Post) -> datetime | None:
-        if hasattr(obj, "pin_info"):
-            return obj.pin_info.pinned_at
-        return None

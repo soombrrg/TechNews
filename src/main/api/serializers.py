@@ -1,6 +1,5 @@
 from typing import Any
 
-from django.utils.text import slugify
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
@@ -8,15 +7,26 @@ from rest_framework import serializers
 from app.serializer import (
     AuthorInfoSerializer,
     CategoryInfoSerializer,
-    PinInfoSerializer,
+    PinnedBySerializer,
 )
 from main.models import Category, Post
+from subscribe.models import PinnedPost
+
+
+class PinInfoSerializer(serializers.ModelSerializer["PinnedPost"]):
+    """Serializer for correct display of pin info in OpenAPI."""
+
+    pinned_by = PinnedBySerializer(source="user", read_only=True)
+
+    class Meta:
+        model = PinnedPost
+        fields = ["pinned_by", "pinned_at"]
 
 
 class CategorySerializer(serializers.ModelSerializer[Category]):
     """Serializer for Category"""
 
-    posts_count = serializers.SerializerMethodField()
+    posts_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Category
@@ -25,28 +35,17 @@ class CategorySerializer(serializers.ModelSerializer[Category]):
             "name",
             "slug",
             "description",
-            "posts_count",
             "created",
+            "posts_count",
         ]
         read_only_fields = ["slug", "created"]
 
-    @extend_schema_field(OpenApiTypes.INT)
-    def get_posts_count(self, obj: Category) -> int:
-        return obj.posts.filter(publication_status=Post.PUBLISHED).count()
 
-    def create(self, validated_data: dict[str, Any]) -> Category:
-        validated_data["slug"] = slugify(validated_data["name"])
-        return super().create(validated_data)
+class PostBaseSerializer(serializers.ModelSerializer[Post]):
 
-
-class PostListSerializer(serializers.ModelSerializer[Post]):
-    """Serializer for list of Posts"""
-
-    author = serializers.StringRelatedField()  # type: ignore[var-annotated]
-    category = serializers.StringRelatedField()  # type: ignore[var-annotated]
     comments_count = serializers.IntegerField(read_only=True)
     is_pinned = serializers.ReadOnlyField()
-    pinned_info = PinInfoSerializer(read_only=True)
+    pinned_info = PinInfoSerializer(source="pin_info", read_only=True)
 
     class Meta:
         model = Post
@@ -61,17 +60,19 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
             "publication_status",
             "comments_count",
             "views_count",
-            "created",
-            "modified",
             "is_pinned",
             "pinned_info",
+            "created",
+            "modified",
         ]
         read_only_fields = ["slug", "author", "views_count"]
 
-    def create(self, validated_data: dict[str, Any]) -> Post:
-        validated_data["author"] = self.context["request"].user
-        validated_data["slug"] = slugify(validated_data["name"])
-        return super().create(validated_data)
+    @extend_schema_field(PinInfoSerializer)
+    def get_pinned_info(self, obj: Post) -> dict[str, Any] | None:
+        """Returns pin info if post is pinned"""
+        if obj.is_pinned:
+            return PinInfoSerializer(obj.pin_info).data
+        return None
 
     def to_representation(self, instance: Post) -> dict[str, Any]:
         data = super().to_representation(instance)
@@ -81,38 +82,30 @@ class PostListSerializer(serializers.ModelSerializer[Post]):
         return data
 
 
-class PostDetailSerializer(serializers.ModelSerializer[Post]):
+class PostListSerializer(PostBaseSerializer):
+    """Serializer for list of Posts"""
+
+    author = serializers.StringRelatedField()  # type: ignore[var-annotated]
+    category = serializers.StringRelatedField()  # type: ignore[var-annotated]
+
+    def create(self, validated_data: dict[str, Any]) -> Post:
+        validated_data["author"] = self.context["request"].user
+        return super().create(validated_data)
+
+
+class PostDetailSerializer(PostBaseSerializer):
     """Serializer for Post details"""
 
     author_info = AuthorInfoSerializer(source="author", read_only=True)
     category_info = CategoryInfoSerializer(source="category", read_only=True)
-    comments_count = serializers.IntegerField(read_only=True)
-    is_pinned = serializers.ReadOnlyField()
-    pinned_info = PinInfoSerializer(read_only=True)
     can_pin = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Post
-        fields = [
-            "id",
-            "title",
-            "slug",
-            "content",
-            "image",
-            "author",
+    class Meta(PostBaseSerializer.Meta):
+        fields = PostBaseSerializer.Meta.fields + [
             "author_info",
-            "category",
             "category_info",
-            "publication_status",
-            "comments_count",
-            "views_count",
-            "is_pinned",
-            "pinned_info",
             "can_pin",
-            "created",
-            "modified",
         ]
-        read_only_fields = ["slug", "author", "views_count"]
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_can_pin(self, obj: Post) -> bool:
@@ -121,17 +114,6 @@ class PostDetailSerializer(serializers.ModelSerializer[Post]):
         if not request or not request.user.is_authenticated:
             return False
         return obj.can_be_pinned_by(request.user)
-
-    def create(self, validated_data: dict[str, Any]) -> Post:
-        validated_data["slug"] = slugify(validated_data["name"])
-        return super().create(validated_data)
-
-    def to_representation(self, instance: Post) -> dict[str, Any]:
-        data = super().to_representation(instance)
-        # For Post card convenient viewing
-        if len(data["content"]) > 200:
-            data["content"] = data["content"][:200] + "..."
-        return data
 
 
 class PostCreateUpdateSerializer(serializers.ModelSerializer[Post]):
@@ -149,13 +131,7 @@ class PostCreateUpdateSerializer(serializers.ModelSerializer[Post]):
 
     def create(self, validated_data: dict[str, Any]) -> Post:
         validated_data["author"] = self.context["request"].user
-        validated_data["slug"] = slugify(validated_data["title"])
         return super().create(validated_data)
-
-    def update(self, instance: Post, validated_data: dict[str, Any]) -> Post:
-        if "title" in validated_data:
-            validated_data["slug"] = slugify(validated_data["title"])
-        return super().update(instance, validated_data)
 
 
 class PostPinningSerializer(serializers.Serializer):

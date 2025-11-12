@@ -40,20 +40,12 @@ class PostQuerySet(models.QuerySet["Post"]):
         """Returns a queryset of pinned posts in pinned_at order"""
         from subscribe.models import Subscription  # noqa
 
-        return (
-            self.filter(
-                pin_info__isnull=False,
-                pin_info__user__subscription__status=Subscription.ACTIVE,
-                pin_info__user__subscription__end_date__gt=Now(),
-                publication_status=PublishedModel.PUBLISHED,
-            )
-            .select_related(
-                "pin_info",
-                "pin_info__user",
-                "pin_info__user__subscription",
-            )
-            .order_by("pin_info__pinned_at")
-        )
+        return self.filter(
+            pin_info__isnull=False,
+            pin_info__user__subscription__status=Subscription.ACTIVE,
+            pin_info__user__subscription__end_date__gt=Now(),
+            publication_status=PublishedModel.PUBLISHED,
+        ).order_by("pin_info__pinned_at")
 
     def regular_posts(self) -> "PostQuerySet":
         """Returns a queryset of regular (unpinned) posts"""
@@ -61,13 +53,15 @@ class PostQuerySet(models.QuerySet["Post"]):
             pin_info__isnull=True, publication_status=PublishedModel.PUBLISHED
         )
 
-    def with_subscription_info(self) -> "PostQuerySet":
-        """Returns a queryset of posts with info about author subscription"""
+    def with_full_info(self) -> "PostQuerySet":
+        """Returns a queryset of posts with info about author, pin_info and category"""
         return self.select_related(
             "author",
-            "author__subscription",
             "category",
-        ).prefetch_related("pin_info")
+            "pin_info",
+            "pin_info__user",
+            "author__subscription",
+        )
 
     def for_feed(self, *args: Any, **kwargs: Any) -> "PostQuerySet":
         """Return a queryset of pinned and unpinned posts in "pinned_at" or "-created" order"""
@@ -78,13 +72,7 @@ class PostQuerySet(models.QuerySet["Post"]):
         from django.db.models import Case, IntegerField, Value, When
 
         return (
-            queryset.select_related(
-                "author",
-                "category",
-                "pin_info",
-                "pin_info__user",
-                "pin_info__user__subscription",
-            )
+            queryset.with_full_info()
             .annotate(
                 # Annotate for sort order: pinned posts first, then by created
                 post_type_order=Case(
