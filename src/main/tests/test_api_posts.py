@@ -388,7 +388,7 @@ class TestTogglePinStatus:
 
         assert p_post
         assert response["msg"]
-        assert response["is_pinned"] == True
+        assert response["post"]["is_pinned"] == True
 
     def test_unpin_success(self, api, auth_user, subscription, pinned_post):
         p_post = PinnedPost.objects.get(user=auth_user)
@@ -401,4 +401,4 @@ class TestTogglePinStatus:
 
         assert not p_post_exists
         assert response["msg"]
-        assert response["is_pinned"] == False
+        assert response["post"]["is_pinned"] == False

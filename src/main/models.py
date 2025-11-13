@@ -12,12 +12,24 @@ if TYPE_CHECKING:
     from accounts.models import User
 
 
+class CategoryQuerySet(models.QuerySet["Category"]):
+    def with_posts_count(self) -> "CategoryQuerySet":
+
+        return self.annotate(
+            posts_count=Count(
+                "posts", filter=Q(posts__publication_status=Post.PUBLISHED)
+            )
+        )
+
+
 class Category(SluggedModel):
     """Model for Posts Categories"""
 
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     created = models.DateTimeField(auto_now_add=True)
+
+    objects = CategoryQuerySet.as_manager()
 
     class Meta:
         db_table = "categories"
@@ -35,6 +47,13 @@ class Category(SluggedModel):
 
 class PostQuerySet(models.QuerySet["Post"]):
     """QuerySet for Post model"""
+
+    def with_pin_info(self) -> "PostQuerySet":
+        return self.select_related(
+            "pin_info",
+            "pin_info__user",
+            "pin_info__user__subscription",
+        )
 
     def pinned(self) -> "PostQuerySet":
         """Returns a queryset of pinned posts in pinned_at order"""

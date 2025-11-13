@@ -49,7 +49,7 @@ class TestCommentListCreate:
         # Normal response
         response = api.post(
             reverse("v1:comments:comment-list"),
-            data={"post": post.pk, "content": "Test content"},
+            data={"post_id": post.pk, "content": "Test content"},
             expected_status_code=201,
         )
         serializer = CommentCreateSerializer()
@@ -341,7 +341,7 @@ class TestCommentReplies:
             assert field in response_replies[0]
 
         # Response should contain only "active" replies
-        assert len(response_replies) == response["replies_count"] == 2
+        assert len(response_replies) == response_parent_comment["replies_count"] == 2
 
         # Replies sorted by "-created"
         assert response_replies[0]["content"] == comment_4.content

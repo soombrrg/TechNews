@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Type
 
 from django.db import transaction
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema
@@ -40,11 +40,7 @@ class CategoryListCreateView(generics.ListCreateAPIView):
     ordering = ["name"]
 
     def get_queryset(self) -> QuerySet["Category"]:
-        return Category.objects.all().annotate(
-            posts_count=Count(
-                "posts", filter=Q(posts__publication_status=Post.PUBLISHED)
-            )
-        )
+        return Category.objects.with_posts_count().all()
 
     def create(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         response = super().create(request, *args, **kwargs)
@@ -60,11 +56,7 @@ class CategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = "slug"
 
     def get_queryset(self) -> QuerySet["Category"]:
-        return Category.objects.all().annotate(
-            posts_count=Count(
-                "posts", filter=Q(posts__publication_status=Post.PUBLISHED)
-            )
-        )
+        return Category.objects.with_posts_count().all()
 
 
 class PostListCreateView(generics.ListCreateAPIView):
@@ -241,7 +233,9 @@ def recent_posts(request: Request) -> Response:
 @permission_classes([permissions.AllowAny])
 def posts_by_category(request: Request, category_slug: str) -> Response:
     """Posts for defined category"""
-    category = get_object_or_404(Category, slug=category_slug)
+    category = get_object_or_404(
+        Category.objects.with_posts_count(), slug=category_slug
+    )
 
     # Retrieving posts depending on pinning
     posts = Post.objects.for_feed(
@@ -329,7 +323,7 @@ def featured_posts(request: Request) -> Response:
     data = {
         "pinned": pinned_serializer.data,
         "popular": popular_serializer.data,
-        "total_pinned": Post.objects.with_full_info().pinned().count(),
+        "total_pinned": Post.objects.with_pin_info().pinned().count(),
     }
 
     return Response(data)

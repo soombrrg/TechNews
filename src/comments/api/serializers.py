@@ -36,17 +36,17 @@ class CommentSerializer(serializers.ModelSerializer[Comment]):
 class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
     """Serializer for Comments creation"""
 
-    post = serializers.IntegerField(write_only=True)
+    post_id = serializers.IntegerField()
 
     class Meta:
         model = Comment
         fields = [
-            "post",
+            "post_id",
             "parent",
             "content",
         ]
 
-    def validate_post(self, value: Post) -> Post | None:
+    def validate_post_id(self, value: Post) -> Post | None:
         # Check if post exists before creating comment
         try:
             post = Post.objects.only("id", "title").get(
@@ -63,9 +63,7 @@ class CommentCreateSerializer(serializers.ModelSerializer[Comment]):
         if not value:
             return value
 
-        post_data = self.initial_data.get("post")
-        if not post_data:
-            return value
+        post_data = self.initial_data.get("post_id")
 
         # If parent provided -> checking belonging to the same post
         if value.post.id != int(post_data):

@@ -20,7 +20,8 @@ class CommentQuerySet(models.QuerySet["Comment"]):
                 "replies",
                 queryset=Comment.objects.filter(is_active=True)
                 .select_related("author")
-                .with_replies_count(),
+                .with_replies_count()
+                .order_by("-created"),
             )
         )
 

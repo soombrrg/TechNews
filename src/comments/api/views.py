@@ -33,7 +33,7 @@ class CommentListCreateView(generics.ListCreateAPIView):
         filters.SearchFilter,
         filters.OrderingFilter,
     )
-    filterset_fields = ["post", "author", "parent"]
+    filterset_fields = ["post_id", "author", "parent"]
     search_fields = ["content"]
     ordering_fields = ["created", "modified"]
     ordering = ["-created"]
@@ -126,6 +126,7 @@ def post_comments(request: Request, post_id: int) -> Response:
             parent=None,
         )
         .select_related("author")
+        .with_replies()
         .with_replies_count()
         .order_by("-created")
     )
@@ -152,14 +153,11 @@ def post_comments(request: Request, post_id: int) -> Response:
 def comment_replies(request: Request, comment_id: int) -> Response:
     """GET comment`s replies"""
     parent_comment = get_object_or_404(
-        Comment.objects.select_related("author")
-        .with_replies()
-        .with_replies_count()
-        .order_by("-created"),
+        Comment.objects.select_related("author").with_replies_count().with_replies(),
         id=comment_id,
     )
 
-    replies = parent_comment.replies.all()
+    replies = parent_comment.replies
 
     parent_comment_serializer = CommentSerializer(
         parent_comment, context={"request": request}
