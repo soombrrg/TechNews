@@ -3,6 +3,8 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.html import format_html
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 
 from payments.models import Payment, PaymentAttempt, Refund, WebhookEvent
 
@@ -37,8 +39,14 @@ class RefundInline(admin.TabularInline):
     can_delete = False
 
 
+class PaymentResource(resources.ModelResource):
+    class Meta:
+        model = Payment
+
+
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ImportExportModelAdmin):
+    resource_classes = [PaymentResource]
     list_display = (
         "id",
         "user_link",

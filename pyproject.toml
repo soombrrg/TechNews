@@ -26,6 +26,7 @@ dependencies = [
     "celery>=5.5.3",
     "django-celery-beat>=2.8.1",
     "stripe>=13.1.1",
+    "django-import-export>=4.3.14",
 ]
 
 [dependency-groups]

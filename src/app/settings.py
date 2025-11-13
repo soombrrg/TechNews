@@ -36,6 +36,7 @@ THIRD_PARTY_APPS = [
     "drf_spectacular_sidecar",
     "corsheaders",
     "whitenoise",
+    "import_export",
     # "cachalot",
     # "storages",
 ]
