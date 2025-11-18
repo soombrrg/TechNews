@@ -28,3 +28,6 @@ up-prod: fmt lint
 
 build:
 	docker build -t test .
+
+worker:
+	uv run celery -A app --workdir src worker --loglevel=info --events --purge
