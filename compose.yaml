@@ -30,7 +30,7 @@ services:
   worker: &celery-base
     image: test
     hostname: worker
-    command: [ "sh", "-c", "uv run celery -A app worker --loglevel=info --events --purge" ]
+    command: [ "sh", "-c", "celery -A app worker --loglevel=info --events --purge" ]
     restart: unless-stopped
     env_file: src/.env
     links:
@@ -46,14 +46,14 @@ services:
     command: [
       "sh",
       "-c",
-      "uv run celery -A app beat --loglevel=info --scheduler celery.beat.PersistentScheduler"
+      "celery -A app beat --loglevel=info --scheduler celery.beat.PersistentScheduler"
     ]
     hostname: beat
 
   flower:
     image: test
     hostname: flower
-    command: [ "sh", "-c", "uv run celery -A app flower --basic_auth=admin:password123" ]
+    command: [ "sh", "-c", "celery -A app flower --basic_auth=admin:admin" ]
     restart: unless-stopped
     env_file: src/.env
     ports:
@@ -72,7 +72,8 @@ services:
     restart: unless-stopped
     env_file: src/.env
     command: ["sh", "-c","./entrypoint.sh"]
-#    command: ["sh", "-c", "uv run uvicorn app.asgi:application --host 0.0.0.0 --port 8000"]
+#    command: ["sh", "-c", "uvicorn app.asgi:application --host 0.0.0.0 --port 8000"]
+#    command: ["sh", "-c", "tail -f /dev/null"] # dev
     ports:
       - "8000:8000"
     depends_on:
