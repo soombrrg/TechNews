@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import path
 
 from payments.api.views import (
     PaymentDetailView,
