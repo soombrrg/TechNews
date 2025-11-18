@@ -272,3 +272,8 @@ postgres
 static
 staticfiles
 .zed
+
+
+
+minio/data
+minio/config

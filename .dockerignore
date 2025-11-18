@@ -6,8 +6,9 @@ src/.env
 __pycache__
 .DS_Store
 *.sqlite3
-staticfiles/
-media/
+
+src/staticfiles/
+src/media/
 .venv
 
 postgres/
@@ -21,3 +22,6 @@ src/.mypy_cache/
 .pytest_cache/
 .zed
 .hypothesis
+
+minio/data/
+minio/config/

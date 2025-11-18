@@ -37,8 +37,8 @@ THIRD_PARTY_APPS = [
     "corsheaders",
     "whitenoise",
     "import_export",
-    # "cachalot",
-    # "storages",
+    "cachalot",
+    "storages",
 ]
 
 LOCAL_APPS = [
@@ -95,9 +95,9 @@ DATABASES = {
     }
 }
 
-# CACHES = {
-# "default": env.cache_url("REDIS_URL"),
-# }
+CACHES = {
+    "default": env.cache_url("REDIS_URL"),
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
