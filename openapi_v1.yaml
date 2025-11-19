@@ -94,10 +94,13 @@ paths:
         content:
           application/json:
             schema:
-              properties:
-                refresh_token:
-                  type: string
-                  description: Refresh token to blacklist
+              $ref: '#/components/schemas/RefreshToken'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefreshToken'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefreshToken'
       security:
       - jwtAuth: []
       responses:
@@ -108,6 +111,7 @@ paths:
                 properties:
                   msg:
                     type: string
+                    example: Logged out successfully.
           description: ''
         '400':
           content:
@@ -116,6 +120,7 @@ paths:
                 properties:
                   error:
                     type: string
+                    example: Invalid token.
           description: ''
   /api/v1/auth/profile/:
     get:
@@ -291,7 +296,7 @@ paths:
         schema:
           type: integer
       - in: query
-        name: post
+        name: post_id
         schema:
           type: integer
       - name: search
@@ -354,23 +359,11 @@ paths:
       - jwtAuth: []
       - {}
       responses:
-        parent_comment:
+        '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Comment'
-          description: ''
-        replies:
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Comment'
-          description: ''
-        replies_count:
-          content:
-            application/json:
-              schema:
-                type: int
+                $ref: '#/components/schemas/CommentReplies'
           description: ''
   /api/v1/comments/{id}/:
     get:
@@ -472,48 +465,9 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/comments/post/{post_id}/:
+  /api/v1/comments/my-comments/:
     get:
-      operationId: comments_post_list
-      description: GET comments of certain post
-      parameters:
-      - in: path
-        name: post_id
-        schema:
-          type: integer
-        required: true
-      tags:
-      - comments
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        post:
-          content:
-            application/json:
-              schema:
-                id:
-                  type: int
-                title:
-                  type: string
-                slug:
-                  type: string
-          description: ''
-        comments:
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Comment'
-          description: ''
-        comments_count:
-          content:
-            application/json:
-              schema:
-                type: int
-          description: ''
-  /api/v1/comments/users-comments/:
-    get:
-      operationId: comments_users_comments_list
+      operationId: comments_my_comments_list
       description: Comments of current user
       parameters:
       - in: query
@@ -556,6 +510,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedCommentList'
+          description: ''
+  /api/v1/comments/post/{post_id}/:
+    get:
+      operationId: comments_post_retrieve
+      description: GET comments of certain post
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - comments
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostComments'
           description: ''
   /api/v1/docs/schema/:
     get:
@@ -702,10 +678,355 @@ paths:
                 type: object
                 additionalProperties: {}
           description: ''
+  /api/v1/payments/:
+    get:
+      operationId: payments_list
+      description: List of user payments.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPaymentList'
+          description: ''
+  /api/v1/payments/{payment_id}/cancel/:
+    post:
+      operationId: payments_cancel_create
+      description: Cancel payment for current user.
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  message:
+                    type: string
+          description: ''
+  /api/v1/payments/{payment_id}/refund/:
+    post:
+      operationId: payments_refund_create
+      description: Create new refund for payment.
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefundCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefundCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatus'
+          description: ''
+  /api/v1/payments/{payment_id}/retry/:
+    post:
+      operationId: payments_retry_create
+      description: Retry payment.
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeCheckoutSession'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+  /api/v1/payments/{payment_id}/status/:
+    get:
+      operationId: payments_status_retrieve
+      description: Check payment status of current user.
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatus'
+          description: ''
+  /api/v1/payments/{id}/:
+    get:
+      operationId: payments_retrieve
+      description: Detail information about a payment.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+          description: ''
+  /api/v1/payments/analytics/:
+    get:
+      operationId: payments_analytics_retrieve
+      description: Analytic of payment for administrators only.
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentAnalytics'
+          description: ''
+  /api/v1/payments/create-checkout-session/:
+    post:
+      operationId: payments_create_checkout_session_create
+      description: Create Stripe Checkout session of subscription payment.
+      tags:
+      - payments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PaymentCreate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PaymentCreate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripeCheckoutSession'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+  /api/v1/payments/history/:
+    get:
+      operationId: payments_history_retrieve
+      description: History of payment history for current user.
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPaymentHistory'
+          description: ''
+  /api/v1/payments/refunds/:
+    get:
+      operationId: payments_refunds_list
+      description: List of refunds for administrators only.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRefundList'
+          description: ''
+  /api/v1/payments/refunds/{id}/:
+    get:
+      operationId: payments_refunds_retrieve
+      description: Detail information about a refund.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+          description: ''
   /api/v1/posts/:
     get:
       operationId: posts_list
-      description: Api endpoint for listing and creating Posts
+      description: |-
+        Api endpoint for listing and creating Posts with support for pinned posts.
+        Pinned posts displayed first in "pinned_at" order.
       parameters:
       - in: query
         name: category
@@ -757,7 +1078,9 @@ paths:
           description: ''
     post:
       operationId: posts_create
-      description: Api endpoint for listing and creating Posts
+      description: |-
+        Api endpoint for listing and creating Posts with support for pinned posts.
+        Pinned posts displayed first in "pinned_at" order.
       tags:
       - posts
       requestBody:
@@ -945,7 +1268,7 @@ paths:
   /api/v1/posts/categories/{category_slug}/posts/:
     get:
       operationId: posts_categories_posts_retrieve
-      description: Post for defined category
+      description: Posts for defined category
       parameters:
       - in: path
         name: category_slug
@@ -958,17 +1281,11 @@ paths:
       - jwtAuth: []
       - {}
       responses:
-        category:
+        '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Category'
-          description: ''
-        posts:
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostList'
+                $ref: '#/components/schemas/PostsByCategory'
           description: ''
   /api/v1/posts/categories/{slug}:
     get:
@@ -1071,10 +1388,13 @@ paths:
       responses:
         '204':
           description: No response body
-  /api/v1/posts/popular/:
+  /api/v1/posts/featured/:
     get:
-      operationId: posts_popular_list
-      description: 10 most popular Posts
+      operationId: posts_featured_retrieve
+      description: |-
+        Recommended posts for main page:
+        - Pinned posts (3 max)
+        - Popular posts for last week
       tags:
       - posts
       security:
@@ -1085,31 +1405,11 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PostList'
+                $ref: '#/components/schemas/FeaturedPosts'
           description: ''
-  /api/v1/posts/recent/:
+  /api/v1/posts/my-posts/:
     get:
-      operationId: posts_recent_list
-      description: 10 most recent Posts
-      tags:
-      - posts
-      security:
-      - jwtAuth: []
-      - {}
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PostList'
-          description: ''
-  /api/v1/posts/users-posts/:
-    get:
-      operationId: posts_users_posts_list
+      operationId: posts_my_posts_list
       description: Api endpoint for listing current user's posts
       parameters:
       - in: query
@@ -1155,8 +1455,433 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedPostListList'
           description: ''
+  /api/v1/posts/pinned/:
+    get:
+      operationId: posts_pinned_retrieve
+      description: Return pinned posts
+      tags:
+      - posts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinnedPostsOnly'
+          description: ''
+  /api/v1/posts/popular/:
+    get:
+      operationId: posts_popular_list
+      description: 10 most popular Posts
+      tags:
+      - posts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostList'
+          description: ''
+  /api/v1/posts/recent/:
+    get:
+      operationId: posts_recent_list
+      description: 10 most recent Posts
+      tags:
+      - posts
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostList'
+          description: ''
+  /api/v1/posts/toggle-pin-status/{slug}:
+    post:
+      operationId: posts_toggle_pin_status_create
+      description: Toggle pinned post status
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - posts
+      security:
+      - jwtAuth: []
+      responses:
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TogglePostPinStatus'
+          description: ''
+  /api/v1/subscribe/can-pin/{post_id}/:
+    get:
+      operationId: subscribe_can_pin_retrieve
+      description: Check if user can pin post with given id
+      parameters:
+      - in: path
+        name: post_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  post_id:
+                    type: integer
+                  can_pin:
+                    type: boolean
+                  checks:
+                    type: object
+                  msg:
+                    type: string
+                    example: Can pin post.
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  post_id:
+                    type: integer
+                  can_pin:
+                    type: boolean
+                  checks:
+                    properties:
+                      post_exists:
+                        type: boolean
+                  msg:
+                    type: string
+                    example: Post not found.
+          description: ''
+  /api/v1/subscribe/cancel/:
+    post:
+      operationId: subscribe_cancel_create
+      description: Cancel user`s subscription
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  msg:
+                    type: string
+                    example: Subscription cancelled successfully.
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+                    example: No active subscription found.
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                properties:
+                  error:
+                    type: string
+                    example: Subscription not found.
+          description: ''
+  /api/v1/subscribe/history/:
+    get:
+      operationId: subscribe_history_list
+      description: History of changes of user`s subscription
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubscriptionHistoryList'
+          description: ''
+  /api/v1/subscribe/my-pinned-post/:
+    get:
+      operationId: subscribe_my_pinned_post_retrieve
+      description: Retrieve, update and delete of user`s pinned post
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinnedPost'
+          description: ''
+    put:
+      operationId: subscribe_my_pinned_post_update
+      description: Retrieve, update and delete of user`s pinned post
+      tags:
+      - subscribe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PinnedPost'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PinnedPost'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PinnedPost'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinnedPost'
+          description: ''
+    patch:
+      operationId: subscribe_my_pinned_post_partial_update
+      description: Retrieve, update and delete of user`s pinned post
+      tags:
+      - subscribe
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPinnedPost'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPinnedPost'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPinnedPost'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinnedPost'
+          description: ''
+    delete:
+      operationId: subscribe_my_pinned_post_destroy
+      description: Retrieve, update and delete of user`s pinned post
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/subscribe/my-subscription/:
+    get:
+      operationId: subscribe_my_subscription_retrieve
+      description: Info of current user's subscription
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+          description: ''
+  /api/v1/subscribe/pinned-posts/:
+    get:
+      operationId: subscribe_pinned_posts_retrieve
+      description: Retrieves list of all pinned posts
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PinnedPostsList'
+          description: ''
+  /api/v1/subscribe/plans/:
+    get:
+      operationId: subscribe_plans_list
+      description: List of available subscription plans
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSubscriptionPlanList'
+          description: ''
+  /api/v1/subscribe/plans/{id}/:
+    get:
+      operationId: subscribe_plans_retrieve
+      description: Detail info of available subscription plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubscriptionPlan'
+          description: ''
+  /api/v1/subscribe/status/:
+    get:
+      operationId: subscribe_status_retrieve
+      description: Returns current user's subscription status
+      tags:
+      - subscribe
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSubscriptionStatus'
+          description: ''
 components:
   schemas:
+    ActionEnum:
+      enum:
+      - created
+      - activated
+      - renewed
+      - cancelled
+      - expired
+      - failed
+      type: string
+      description: |-
+        * `created` - Created
+        * `activated` - Activated
+        * `renewed` - Renewed
+        * `cancelled` - Cancelled
+        * `expired` - Expired
+        * `failed` - Failed
+    AuthorInfo:
+      type: object
+      description: Serializer for correct display of author info in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        full_name:
+          type: string
+          readOnly: true
+        avatar:
+          type: string
+          format: uri
+          nullable: true
+          title: Аватар
+      required:
+      - username
     Category:
       type: object
       description: Serializer for Category
@@ -1173,13 +1898,29 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         description:
           type: string
-        posts_count:
-          type: integer
-          readOnly: true
         created:
           type: string
           format: date-time
           readOnly: true
+        posts_count:
+          type: integer
+          readOnly: true
+      required:
+      - name
+    CategoryInfo:
+      type: object
+      description: Serializer for correct display of category info in OpenAPI.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
       required:
       - name
     ChangePassword:
@@ -1210,8 +1951,8 @@ components:
           format: uuid
           readOnly: true
         author_info:
-          type: object
-          additionalProperties: {}
+          allOf:
+          - $ref: '#/components/schemas/AuthorInfo'
           readOnly: true
         parent:
           type: integer
@@ -1239,7 +1980,7 @@ components:
       type: object
       description: Serializer for Comments creation
       properties:
-        post:
+        post_id:
           type: integer
         parent:
           type: integer
@@ -1248,7 +1989,7 @@ components:
           type: string
       required:
       - content
-      - post
+      - post_id
     CommentDetail:
       type: object
       description: Detail serializer for Comments with responses
@@ -1263,8 +2004,8 @@ components:
           format: uuid
           readOnly: true
         author_info:
-          type: object
-          additionalProperties: {}
+          allOf:
+          - $ref: '#/components/schemas/AuthorInfo'
           readOnly: true
         parent:
           type: integer
@@ -1287,14 +2028,29 @@ components:
           format: date-time
           nullable: true
         replies:
-          oneOf:
-          - type: object
-            additionalProperties: {}
-          - type: array
-            items: {}
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
           readOnly: true
       required:
       - content
+    CommentReplies:
+      type: object
+      description: Serializer for correct display of comment_replies view response
+        data in OpenAPI.
+      properties:
+        parent_comment:
+          allOf:
+          - $ref: '#/components/schemas/Comment'
+          readOnly: true
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+          readOnly: true
+        replies_count:
+          type: integer
+          readOnly: true
     CommentUpdate:
       type: object
       description: Serializer for Comments update
@@ -1303,6 +2059,35 @@ components:
           type: string
       required:
       - content
+    CreatedByInfo:
+      type: object
+      description: Serializer for correct display of created_by_info field in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+    FeaturedPosts:
+      type: object
+      description: Serializer for correct display of featured_posts view response
+        data in OpenAPI.
+      properties:
+        pinned:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostList'
+          readOnly: true
+        popular_posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostList'
+          readOnly: true
+        total_pinned:
+          type: integer
+          readOnly: true
     PaginatedCategoryList:
       type: object
       required:
@@ -1349,6 +2134,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Comment'
+    PaginatedPaymentList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
     PaginatedPostListList:
       type: object
       required:
@@ -1372,6 +2180,75 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PostList'
+    PaginatedRefundList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Refund'
+    PaginatedSubscriptionHistoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionHistory'
+    PaginatedSubscriptionPlanList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionPlan'
     PatchedCategory:
       type: object
       description: Serializer for Category
@@ -1388,12 +2265,12 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         description:
           type: string
-        posts_count:
-          type: integer
-          readOnly: true
         created:
           type: string
           format: date-time
+          readOnly: true
+        posts_count:
+          type: integer
           readOnly: true
     PatchedChangePassword:
       type: object
@@ -1411,6 +2288,23 @@ components:
       properties:
         content:
           type: string
+    PatchedPinnedPost:
+      type: object
+      description: Serializer for pinned posts
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        post:
+          type: integer
+        post_info:
+          allOf:
+          - $ref: '#/components/schemas/PostInfo'
+          readOnly: true
+        pinned_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedPostCreateUpdate:
       type: object
       description: Serializer for creating and updating posts
@@ -1449,6 +2343,343 @@ components:
         bio:
           type: string
           title: О себе
+    Payment:
+      type: object
+      description: Serializer for Payments
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        user_info:
+          allOf:
+          - $ref: '#/components/schemas/UserInfo'
+          readOnly: true
+        subscription:
+          type: string
+          format: uuid
+          nullable: true
+        subscription_info:
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionInfo'
+          readOnly: true
+        description:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          readOnly: true
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethodEnum'
+        is_pending:
+          type: boolean
+          description: Check if payment is pending
+          readOnly: true
+        is_successful:
+          type: boolean
+          description: Check if payment is successful
+          readOnly: true
+        can_be_refunded:
+          type: boolean
+          description: Check if payment can be refunded
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        processed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - amount
+    PaymentAnalytics:
+      type: object
+      description: Serializer for correct display of payment_analytics view response
+        data in OpenAPI.
+      properties:
+        total_payments:
+          type: integer
+          readOnly: true
+        successful_payments:
+          type: integer
+          readOnly: true
+        success_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        total_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        monthly_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        monthly_payments:
+          type: integer
+          readOnly: true
+        avg_payment:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        active_subscriptions:
+          type: integer
+          readOnly: true
+        period:
+          type: object
+          additionalProperties:
+            type: string
+            format: date-time
+          readOnly: true
+    PaymentCreate:
+      type: object
+      description: Serializer for Payment creation
+      properties:
+        subscription_plan_id:
+          type: integer
+        payment_method:
+          allOf:
+          - $ref: '#/components/schemas/PaymentMethodEnum'
+          default: stripe
+        success_url:
+          type: string
+          format: uri
+        cancel_url:
+          type: string
+          format: uri
+      required:
+      - subscription_plan_id
+    PaymentInfo:
+      type: object
+      description: Serializer for correct display of subscription_info field in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        currency:
+          type: string
+          readOnly: true
+          maxLength: 3
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+    PaymentMethodEnum:
+      enum:
+      - stripe
+      - paypal
+      - manual
+      type: string
+      description: |-
+        * `stripe` - Stripe
+        * `paypal` - PayPal
+        * `manual` - Manual
+    PaymentStatus:
+      type: object
+      description: Serializer for Payment Status
+      properties:
+        payment_id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        message:
+          type: string
+        subscription_activated:
+          type: boolean
+          default: false
+      required:
+      - message
+      - payment_id
+      - status
+    PaymentStatusEnum:
+      enum:
+      - pending
+      - processing
+      - succeeded
+      - cancelled
+      - failed
+      - refunded
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `processing` - Processing
+        * `succeeded` - Succeeded
+        * `cancelled` - Cancelled
+        * `failed` - Failed
+        * `refunded` - Refunded
+    PinInfo:
+      type: object
+      description: Serializer for correct display of pin info in OpenAPI.
+      properties:
+        pinned_by:
+          allOf:
+          - $ref: '#/components/schemas/PinnedBy'
+          readOnly: true
+        pinned_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PinnedBy:
+      type: object
+      description: Serializer for correct display of pinned by info in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        has_active_subscription:
+          type: boolean
+          readOnly: true
+      required:
+      - username
+    PinnedPost:
+      type: object
+      description: Serializer for pinned posts
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        post:
+          type: integer
+        post_info:
+          allOf:
+          - $ref: '#/components/schemas/PostInfo'
+          readOnly: true
+        pinned_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - post
+    PinnedPostData:
+      type: object
+      description: Serializer for correct display of pinned post data in OpenAPI.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        content:
+          type: string
+        image:
+          type: string
+          format: uri
+          nullable: true
+        views_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        category:
+          type: string
+          readOnly: true
+        author:
+          allOf:
+          - $ref: '#/components/schemas/AuthorInfo'
+          readOnly: true
+        comments_count:
+          type: integer
+          readOnly: true
+        pinned_at:
+          type: string
+          format: date-time
+          readOnly: true
+        is_pinned:
+          type: boolean
+          description: Check if post is pinned
+          readOnly: true
+      required:
+      - content
+      - title
+    PinnedPostsList:
+      type: object
+      description: Serializer for correct display of pinned_posts_list view response
+        data in OpenAPI.
+      properties:
+        count:
+          type: integer
+          readOnly: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PinnedPostData'
+          readOnly: true
+    PinnedPostsOnly:
+      type: object
+      description: Serializer for correct display of pinned_posts view response data
+        in OpenAPI.
+      properties:
+        count:
+          type: integer
+          readOnly: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostList'
+          readOnly: true
+    PostComments:
+      type: object
+      description: Serializer for correct display of post_comments view response data
+        in OpenAPI.
+      properties:
+        post:
+          allOf:
+          - $ref: '#/components/schemas/PostData'
+          readOnly: true
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+          readOnly: true
+        comments_count:
+          type: integer
+          readOnly: true
     PostCreateUpdate:
       type: object
       description: Serializer for creating and updating posts
@@ -1470,9 +2701,22 @@ components:
       required:
       - content
       - title
+    PostData:
+      type: object
+      description: Serializer for correct display of post data in OpenAPI.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
     PostDetail:
       type: object
-      description: Serializer for detail of Post
+      description: Serializer for Post details
       properties:
         id:
           type: integer
@@ -1494,26 +2738,24 @@ components:
           type: string
           format: uuid
           readOnly: true
-        author_info:
-          type: object
-          additionalProperties: {}
-          readOnly: true
         category:
           type: integer
           nullable: true
-        category_info:
-          type: object
-          additionalProperties: {}
-          nullable: true
-          readOnly: true
         publication_status:
           $ref: '#/components/schemas/PublicationStatusEnum'
         comments_count:
           type: integer
-          description: Count of comments for post
           readOnly: true
         views_count:
           type: integer
+          readOnly: true
+        is_pinned:
+          type: boolean
+          description: Check if post is pinned
+          readOnly: true
+        pinned_info:
+          allOf:
+          - $ref: '#/components/schemas/PinInfo'
           readOnly: true
         created:
           type: string
@@ -1523,6 +2765,49 @@ components:
           type: string
           format: date-time
           nullable: true
+        author_info:
+          allOf:
+          - $ref: '#/components/schemas/AuthorInfo'
+          readOnly: true
+        category_info:
+          allOf:
+          - $ref: '#/components/schemas/CategoryInfo'
+          readOnly: true
+        can_pin:
+          type: boolean
+          description: Returns can post be pinned by user or not
+          readOnly: true
+      required:
+      - content
+      - title
+    PostInfo:
+      type: object
+      description: Serializer for correct display of post info in OpenAPI.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        slug:
+          type: string
+          maxLength: 255
+          pattern: ^[-a-zA-Z0-9_]+$
+        content:
+          type: string
+        image:
+          type: string
+          format: uri
+          nullable: true
+        views_count:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        created:
+          type: string
+          format: date-time
+          readOnly: true
       required:
       - content
       - title
@@ -1556,10 +2841,17 @@ components:
           $ref: '#/components/schemas/PublicationStatusEnum'
         comments_count:
           type: integer
-          description: Count of comments for post
           readOnly: true
         views_count:
           type: integer
+          readOnly: true
+        is_pinned:
+          type: boolean
+          description: Check if post is pinned
+          readOnly: true
+        pinned_info:
+          allOf:
+          - $ref: '#/components/schemas/PinInfo'
           readOnly: true
         created:
           type: string
@@ -1572,6 +2864,20 @@ components:
       required:
       - content
       - title
+    PostsByCategory:
+      type: object
+      description: Serializer for correct display of posts_by_category view response
+        data in OpenAPI.
+      properties:
+        category:
+          allOf:
+          - $ref: '#/components/schemas/Category'
+          readOnly: true
+        posts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PostList'
+          readOnly: true
     PublicationStatusEnum:
       enum:
       - d
@@ -1580,6 +2886,252 @@ components:
       description: |-
         * `d` - Draft
         * `p` - Published
+    RefreshToken:
+      type: object
+      description: Serializer for correct refresh token display in OpenAPI.
+      properties:
+        refresh_token:
+          type: string
+          readOnly: true
+    Refund:
+      type: object
+      description: Serializer for Refund
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        payment:
+          type: string
+          format: uuid
+        payment_info:
+          allOf:
+          - $ref: '#/components/schemas/PaymentInfo'
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        reason:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/RefundStatusEnum'
+          readOnly: true
+        is_partial:
+          type: boolean
+          description: Check if refund is partial
+          readOnly: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+        created_by_info:
+          allOf:
+          - $ref: '#/components/schemas/CreatedByInfo'
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        processed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - amount
+      - payment
+    RefundCreate:
+      type: object
+      description: Serializer for Refund creation
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        reason:
+          type: string
+      required:
+      - amount
+    RefundStatusEnum:
+      enum:
+      - pending
+      - succeeded
+      - cancelled
+      - failed
+      type: string
+      description: |-
+        * `pending` - Pending
+        * `succeeded` - Succeeded
+        * `cancelled` - Cancelled
+        * `failed` - Failed
+    StripeCheckoutSession:
+      type: object
+      description: Serializer for Stripe Checkout Session
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          readOnly: true
+        session_id:
+          type: integer
+          readOnly: true
+        payment_id:
+          type: integer
+          readOnly: true
+    Subscription:
+      type: object
+      description: Serializer for Subscriptions
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          type: string
+          format: uuid
+          readOnly: true
+        user_info:
+          allOf:
+          - $ref: '#/components/schemas/AuthorInfo'
+          readOnly: true
+        plan:
+          type: integer
+        plan_info:
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionPlan'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionStatusEnum'
+          readOnly: true
+        start_date:
+          type: string
+          format: date-time
+          readOnly: true
+        end_date:
+          type: string
+          format: date-time
+          readOnly: true
+        days_remaining:
+          type: integer
+          description: Returns number of days before subscription ending
+          readOnly: true
+        auto_renew:
+          type: boolean
+        is_active:
+          type: boolean
+          description: Check if subscription is active
+          readOnly: true
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+        modified:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - plan
+    SubscriptionHistory:
+      type: object
+      description: Serializer for subscription history
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+        description:
+          type: string
+        metadata: {}
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - action
+    SubscriptionInfo:
+      type: object
+      description: Serializer for correct display of subscription_info field in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        plan_name:
+          type: string
+          readOnly: true
+        start_date:
+          type: string
+          format: date-time
+          readOnly: true
+        end_date:
+          type: string
+          format: date-time
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SubscriptionStatusEnum'
+          readOnly: true
+    SubscriptionPlan:
+      type: object
+      description: Serializer for Subscription Plans
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        duration_days:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        features:
+          description: List of subscription plan's features
+        is_active:
+          type: boolean
+        created:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - name
+      - price
+    SubscriptionStatusEnum:
+      enum:
+      - active
+      - expired
+      - cancelled
+      - pending
+      type: string
+      description: |-
+        * `active` - Active
+        * `expired` - Expired
+        * `cancelled` - Canceled
+        * `pending` - Pending
+    TogglePostPinStatus:
+      type: object
+      description: Serializer for correct display of toggle_post_pin_status view response
+        data in OpenAPI.
+      properties:
+        msg:
+          type: string
+          readOnly: true
+        is_pinned:
+          type: boolean
+          readOnly: true
+        post:
+          allOf:
+          - $ref: '#/components/schemas/PostDetail'
+          readOnly: true
     TokenRefresh:
       type: object
       properties:
@@ -1598,6 +3150,21 @@ components:
           writeOnly: true
       required:
       - token
+    UserInfo:
+      type: object
+      description: Serializer for correct display of user_info field in OpenAPI.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
     UserLogin:
       type: object
       description: Serializer for user logging in
@@ -1611,6 +3178,19 @@ components:
       required:
       - email
       - password
+    UserPaymentHistory:
+      type: object
+      description: Serializer for correct display of user_payment_history view response
+        data in OpenAPI.
+      properties:
+        count:
+          type: integer
+          readOnly: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+          readOnly: true
     UserProfile:
       type: object
       description: Serializer for user profile
@@ -1699,6 +3279,30 @@ components:
       - password
       - password_confirmation
       - username
+    UserSubscriptionStatus:
+      type: object
+      description: Serializer for user subscription status
+      properties:
+        has_subscription:
+          type: boolean
+        is_active:
+          type: boolean
+        can_pin_posts:
+          type: boolean
+        subscription:
+          allOf:
+          - $ref: '#/components/schemas/Subscription'
+          nullable: true
+        pinned_post:
+          allOf:
+          - $ref: '#/components/schemas/PinnedPost'
+          nullable: true
+      required:
+      - can_pin_posts
+      - has_subscription
+      - is_active
+      - pinned_post
+      - subscription
     UserUpdate:
       type: object
       description: Serializer for updating user profile

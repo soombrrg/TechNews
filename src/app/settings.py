@@ -281,8 +281,8 @@ REST_FRAMEWORK = {
 
 # Swagger customization
 SPECTACULAR_SETTINGS = {
-    "TITLE": "API Title",
-    "DESCRIPTION": "API built with DRF",
+    "TITLE": "News Site API",
+    "DESCRIPTION": "News Site API built with DRF",
     "SCHEMA_PATH_PREFIX": r"/api/v[0-9]",
     # "SCHEMA_PATH_PREFIX_TRIM": True,
     "SERVE_INCLUDE_SCHEMA": True,
