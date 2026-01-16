@@ -169,6 +169,33 @@ news_project/
 └── README.md                 # This file
 ```
 
+### Visual Overview
+
+```mermaid
+graph LR
+    Root[news_project] --> BackendDir[backend/]
+    Root --> FrontendDir[frontend/]
+    Root --> NginxConf[nginx.conf]
+    Root --> Compose[compose.yaml]
+    
+    subgraph Backend [Django Backend]
+        BackendDir --> B_Src[src/]
+        B_Src --> B_Accounts[accounts/]
+        B_Src --> B_App[app/]
+        B_Src --> B_Main[main/]
+        B_Src --> B_Payments[payments/]
+        B_Src --> B_Subscribe[subscribe/]
+    end
+    
+    subgraph Frontend [Vue Frontend]
+        FrontendDir --> F_Src[src/]
+        F_Src --> F_Components[components/]
+        F_Src --> F_Services[services/]
+        F_Src --> F_Stores[stores/]
+        F_Src --> F_Views[views/]
+    end
+```
+
 ## 🧪 Testing
 
 ### Backend
