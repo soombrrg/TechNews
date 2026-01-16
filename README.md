@@ -169,31 +169,46 @@ news_project/
 └── README.md                 # This file
 ```
 
-### Visual Overview
+### System Architecture
 
 ```mermaid
-graph LR
-    Root[news_project] --> BackendDir[backend/]
-    Root --> FrontendDir[frontend/]
-    Root --> NginxConf[nginx.conf]
-    Root --> Compose[compose.yaml]
+graph TD
+    User([User Browser]) <--> Nginx[Nginx Proxy]
     
-    subgraph Backend [Django Backend]
-        BackendDir --> B_Src[src/]
-        B_Src --> B_Accounts[accounts/]
-        B_Src --> B_App[app/]
-        B_Src --> B_Main[main/]
-        B_Src --> B_Payments[payments/]
-        B_Src --> B_Subscribe[subscribe/]
+    subgraph "Frontend Layer (Vue 3 + Vite)"
+        Nginx <--> Frontend[Vue SPA]
     end
     
-    subgraph Frontend [Vue Frontend]
-        FrontendDir --> F_Src[src/]
-        F_Src --> F_Components[components/]
-        F_Src --> F_Services[services/]
-        F_Src --> F_Stores[stores/]
-        F_Src --> F_Views[views/]
+    subgraph "API Layer (Django REST Framework)"
+        Nginx <--> Backend[Django API]
+        Backend --> JWT[JWT Auth]
     end
+    
+    subgraph "Data & Cache Layer"
+        Backend <--> DB[(PostgreSQL 17)]
+        Backend <--> Redis[(Redis 6.4)]
+        Cachalot[Django-Cachalot] -.-> Redis
+    end
+    
+    subgraph "Async Processing (Celery)"
+        Backend --> Broker(Redis Broker)
+        Broker --> Worker[Celery Worker]
+        Beat[Celery Beat] --> Broker
+        Worker --> Flower[Flower Monitor]
+    end
+    
+    subgraph "Storage & External"
+        Backend <--> MinIO[(MinIO S3)]
+        Backend -- API --> Stripe[Stripe API]
+        Stripe -- Webhooks --> Backend
+    end
+
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style Nginx fill:#66cc99,stroke:#333,stroke-width:2px
+    style DB fill:#336699,color:#fff
+    style Redis fill:#cc3333,color:#fff
+    style MinIO fill:#ff9900,color:#fff
+    style Stripe fill:#6772e5,color:#fff
 ```
 
 ## 🧪 Testing
