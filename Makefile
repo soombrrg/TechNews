@@ -1,33 +1,12 @@
-manage = uv run python src/manage.py
+up-prod:
+	docker compose up
 
-deps:
-	uv sync
+up-dev:
+	docker compose up postgres redis s3
 
-fmt:
-	uv run black src
-	uv run isort src
+back:
+	cd backend && make up
 
-lint:
-	uv run flake8 src
-	uv run mypy src
-
-test:
-	cd src && uv run pytest
-
-prep:
-	$(manage) makemigrations
-	$(manage) migrate
-
-up:
-	cd src && uvicorn app.asgi:application --host 0.0.0.0 --port 8000 --reload
-
-up-prod: fmt lint
-	$(manage) collectstatic --no-input
-	$(manage) migrate
-	cd src && uvicorn app.asgi:application --host 0.0.0.0 --port 8000
-
-build:
-	docker build -t test .
-
-worker:
-	uv run celery -A app --workdir src worker --loglevel=info --events --purge
+front:
+	cd frontend && npm run dev
+	

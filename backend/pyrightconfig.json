@@ -1,0 +1,22 @@
+{
+  "include": ["src", "src/app"],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.venv",
+    "**/.git",
+    "**/.zed",
+    "**/.idea"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false,
+  "reportArgumentType": false,
+  "reportAttributeAccessIssue": false,
+  "typeCheckingMode": "basic",
+  "extraPaths": [
+        "./venv/lib/python3.11/site-packages/djangorestframework_stubs",
+        "./venv/lib/python3.11/site-packages/django_stubs"
+  ]
+}

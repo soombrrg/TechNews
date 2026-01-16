@@ -268,12 +268,11 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/python,django
 
 .idea
-postgres
 static
 staticfiles
-.zed
+.vscode
+.vscode/*
 
-
-
+postgres
 minio/data
 minio/config
