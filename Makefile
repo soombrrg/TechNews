@@ -9,4 +9,12 @@ back:
 
 front:
 	cd frontend && npm run dev
-	
+
+back-deps:
+	cd backend && make deps
+
+back-prep:
+	cd backend && make prep
+
+build:
+	docker compose build
